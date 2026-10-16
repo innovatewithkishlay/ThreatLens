@@ -1,15 +1,22 @@
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema({
+  caseId: { type: mongoose.Schema.Types.ObjectId, ref: "Case", required: true, index: true },
+  row: Number,
+  reference: String,
   fromAccount: { type: String, required: true },
   toAccount: { type: String, required: true },
   amount: { type: Number, required: true },
-  date: { type: Date, default: Date.now },
-  description: { type: String },
-  caseId: { type: mongoose.Schema.Types.ObjectId, ref: "Case" },
+  currency: String,
+  date: Date,
+  description: String,
+  country: String,
   isSuspicious: { type: Boolean, default: false },
-  metadata: {
-    ipCountry: { type: String },
+  flags: [String],
+  reviewStatus: {
+    type: String,
+    enum: ["unreviewed", "suspicious", "cleared"],
+    default: "unreviewed",
   },
 });
 

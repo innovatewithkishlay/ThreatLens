@@ -1,349 +1,248 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { useAML } from "../hooks/useApi";
-import { CaseComparison } from "../types/apiTypes";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  FiAlertTriangle,
-  FiClock,
-  FiGlobe,
-  FiLink,
-  FiActivity,
-  FiUser,
-  FiSmartphone,
-  FiAtSign,
-  FiServer,
-} from "react-icons/fi";
-import { RiskMeter } from "../components/DataDisplay/RiskMeter";
+import { Link, useParams } from "react-router-dom";
+import clsx from "clsx";
+import { FiArrowLeft, FiArrowRight, FiCalendar, FiClock, FiGitMerge, FiGlobe, FiLink, FiShare2, FiUsers } from "react-icons/fi";
+import { PageContainer } from "../components/layout/AppShell";
+import { Card, CardHeader, EmptyState } from "../components/ui/Card";
+import { LinkButton } from "../components/ui/Button";
+import { SeverityBadge } from "../components/ui/Badge";
+import { RiskGauge } from "../components/ui/RiskGauge";
+import { PageLoader } from "../components/ui/Spinner";
+import { ErrorPanel } from "../components/ui/ErrorPanel";
+import { NetworkGraph } from "../components/viz/NetworkGraph";
+import { api, type ApiError } from "../lib/api";
+import { formatDate, formatMoney, formatNumber, riskColor, SEVERITY, typologyLabel } from "../lib/format";
+import { countryName, flag } from "../lib/countries";
+import type { ComparisonCase, ComparisonResponse } from "../lib/types";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
-export const CompareResults = () => {
-  const { case1Id, case2Id } = useParams<{
-    case1Id: string;
-    case2Id: string;
-  }>();
-  const { compareCases } = useAML();
-  const [comparisonData, setComparisonData] = useState<CaseComparison | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const CaseCard = ({ c, tag, color }: { c: ComparisonCase; tag: string; color: string }) => (
+  <Link to={`/cases/${c._id}`} className="card card-hover block p-4">
+    <div className="flex items-center justify-between">
+      <span className="rounded-md px-2 py-0.5 text-xs font-bold text-ink-950" style={{ background: color }}>{tag}</span>
+      <span className="font-display text-xl font-bold" style={{ color: riskColor(c.riskScore) }}>{c.riskScore}</span>
+    </div>
+    <div className="mt-2 truncate font-semibold text-white">{c.name}</div>
+    <div className="font-mono text-xs text-slate-500">{c.caseId}</div>
+    <div className="mt-2 text-xs text-slate-400">{formatNumber(c.stats.transactionCount)} transfers · {formatNumber(c.stats.accountCount)} accounts</div>
+  </Link>
+);
+
+const Meter = ({ label, value }: { label: string; value: number }) => (
+  <div>
+    <div className="mb-1 flex justify-between text-sm"><span className="text-slate-300">{label}</span><span className="font-mono text-xs text-slate-400">{Math.round(value * 100)}%</span></div>
+    <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+      <div className="h-full rounded-full bg-gradient-to-r from-accent to-cyan-glow" style={{ width: `${Math.max(2, value * 100)}%` }} />
+    </div>
+  </div>
+);
+
+const CompareResults = () => {
+  const { a = "", b = "" } = useParams();
+  const [data, setData] = useState<ComparisonResponse | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  useDocumentTitle("Cross-case report");
 
   useEffect(() => {
-    const loadComparison = async () => {
-      if (!case1Id || !case2Id) {
-        setError("Invalid case IDs");
-        setIsLoading(false);
-        return;
-      }
+    setData(null);
+    api.compare(a, b).then(setData).catch(setError);
+  }, [a, b]);
 
-      try {
-        const data = await compareCases(case1Id, case2Id);
-        setComparisonData(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load comparison"
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadComparison();
-  }, [case1Id, case2Id]);
-
-  if (isLoading) {
+  if (error)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#151515] flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="w-16 h-16 border-4 border-[#00ff9d] border-t-transparent rounded-full"
-        />
-      </div>
+      <PageContainer>
+        <ErrorPanel error={error} title="Comparison failed" />
+        <LinkButton to="/compare" variant="secondary" className="mt-4" icon={<FiArrowLeft />}>Back</LinkButton>
+      </PageContainer>
     );
-  }
+  if (!data) return <PageLoader label="Linking cases" />;
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#151515] flex items-center justify-center text-red-400">
-        <FiAlertTriangle className="mr-2" /> {error}
-      </div>
-    );
-  }
-
-  if (!comparisonData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#151515] flex items-center justify-center text-gray-400">
-        No comparison data found
-      </div>
-    );
-  }
-
-  const getMetadataItems = (items: string[], icon: React.ReactNode) => (
-    <div className="space-y-2">
-      {items.map((item, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex items-center space-x-2 text-gray-300"
-        >
-          {icon}
-          <span className="font-mono text-sm">{item}</span>
-        </motion.div>
-      ))}
-    </div>
-  );
+  const { caseA, caseB, comparison: c } = data;
+  const fmtRange = (r: { start: string; end: string } | null) => (r ? `${formatDate(r.start)} – ${formatDate(r.end)}` : "No dates");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#151515] text-[#00ff9d] p-8">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-12 text-center space-y-4"
-      >
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-[#00ff9d] to-[#00d4ff] bg-clip-text text-transparent">
-          Cross-Case Intelligence
-        </h1>
-        <p className="text-gray-400 font-mono">
-          Analyzing connections between Case {case1Id} and Case {case2Id}
-        </p>
-      </motion.div>
+    <PageContainer className="!pt-6">
+      <Link to="/compare" className="mb-5 inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white"><FiArrowLeft /> New comparison</Link>
 
-      <div className="max-w-7xl mx-auto space-y-8">
-        <Section title="Risk Overview" icon={<FiActivity />}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="col-span-1">
-              <RiskMeter
-                score={comparisonData.comparison.riskAssessment.totalRisk || 0}
-                level={
-                  comparisonData.comparison.riskAssessment.riskLevel || "LOW"
-                }
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 col-span-2">
-              <InfoCard
-                icon={<FiUser />}
-                label="Shared Accounts"
-                value={
-                  comparisonData.comparison.riskAssessment.riskFactors
-                    .sharedAccounts
-                }
-                unit="accounts"
-              />
-              <InfoCard
-                icon={<FiLink />}
-                label="High Value Links"
-                value={
-                  comparisonData.comparison.riskAssessment.riskFactors
-                    .highValueOverlap
-                }
-                unit="transactions"
-              />
-              <InfoCard
-                icon={<FiGlobe />}
-                label="Geo Risk"
-                value={
-                  comparisonData.comparison.riskAssessment.riskFactors
-                    .geographicRisk
-                }
-                unit="points"
-              />
-            </div>
+      <Card className="relative overflow-hidden p-5 sm:p-6">
+        <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-cyan-glow/10 blur-3xl" />
+        <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_auto_1fr]">
+          <CaseCard c={caseA} tag="A" color="#00ff9d" />
+          <div className="flex flex-col items-center gap-2 text-center">
+            <RiskGauge score={c.linkScore} size={136} label="Link" />
+            <SeverityBadge level={c.linkLevel} />
           </div>
-        </Section>
+          <CaseCard c={caseB} tag="B" color="#22d3ee" />
+        </div>
+        <p className="relative mx-auto mt-6 max-w-2xl text-center text-slate-300">{c.verdict}</p>
+      </Card>
 
-        <Section title="Connection Map" icon={<FiLink />}>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="bg-[#0d0d0d] p-6 rounded-2xl border border-[#00ff9d]/20">
-              <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
-                <FiUser className="text-[#00ff9d]" />
-                <span>Shared Accounts</span>
-              </h3>
-              {comparisonData.comparison.directLinks.sharedAccounts.length >
-              0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {comparisonData.comparison.directLinks.sharedAccounts.map(
-                    (account) => (
-                      <span
-                        key={account}
-                        className="font-mono px-3 py-1.5 bg-[#00ff9d]/10 rounded-full"
-                      >
-                        {account}
-                      </span>
-                    )
-                  )}
-                </div>
-              ) : (
-                <div className="text-gray-400">No shared accounts found</div>
-              )}
-            </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader title="Link score breakdown" icon={<FiLink />} />
+          <div className="space-y-3 px-5 pb-5">
+            {c.factors.map((f) => (
+              <div key={f.key} className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-slate-300">{f.label}</span>
+                <span className="flex items-center gap-3">
+                  <span className="font-mono text-xs text-slate-500">{f.key === "patternSimilarity" ? `${Math.round(f.value * 100)}%` : f.value}</span>
+                  <span className={clsx("w-10 rounded-md px-1.5 py-0.5 text-center font-mono text-xs", f.points ? "bg-accent/10 text-accent" : "bg-white/[0.04] text-slate-600")}>+{f.points}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
 
-            <div className="bg-[#0d0d0d] p-6 rounded-2xl border border-[#00ff9d]/20">
-              <h3 className="text-lg font-bold mb-4 flex items-center space-x-2">
-                <FiServer className="text-[#00ff9d]" />
-                <span>Digital Footprint</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <MetadataSection
-                  icon={<FiAtSign className="text-[#00ff9d]" />}
-                  title="Emails"
-                  items={
-                    comparisonData.comparison.directLinks.sharedMetadata.emails
-                  }
-                />
-                <MetadataSection
-                  icon={<FiSmartphone className="text-[#00ff9d]" />}
-                  title="Phones"
-                  items={
-                    comparisonData.comparison.directLinks.sharedMetadata.phones
-                  }
-                />
-                <MetadataSection
-                  icon={<FiGlobe className="text-[#00ff9d]" />}
-                  title="IPs"
-                  items={
-                    comparisonData.comparison.directLinks.sharedMetadata.ips
-                  }
-                />
+        <Card>
+          <CardHeader title="Pattern similarity" subtitle="Cosine similarity of behavioural profiles" icon={<FiGitMerge />} />
+          <div className="space-y-4 px-5 pb-5">
+            <Meter label="Typologies" value={c.similarity.typologies} />
+            <Meter label="Amount distribution" value={c.similarity.amounts} />
+            <Meter label="Time of day" value={c.similarity.timeOfDay} />
+            {c.commonTypologies.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {c.commonTypologies.map((t) => <span key={t} className="rounded-md bg-white/[0.05] px-2 py-0.5 text-xs text-slate-300">{typologyLabel(t)}</span>)}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Timeline & geography" icon={<FiCalendar />} />
+          <div className="space-y-4 px-5 pb-5 text-sm">
+            <div className="space-y-1">
+              <div className="flex justify-between"><span className="text-accent">Case A</span><span className="text-slate-400">{fmtRange(c.temporal.caseA)}</span></div>
+              <div className="flex justify-between"><span className="text-cyan-glow">Case B</span><span className="text-slate-400">{fmtRange(c.temporal.caseB)}</span></div>
+              <div className="flex justify-between border-t border-white/[0.05] pt-2">
+                <span className="text-slate-300">Overlap</span>
+                <span className={c.temporal.overlap ? "text-white" : "text-slate-500"}>{c.temporal.overlap ? `${c.temporal.overlap.days} days` : "None"}</span>
               </div>
             </div>
-          </div>
-        </Section>
-
-        <Section title="Transaction Network" icon={<FiGlobe />}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-[#0d0d0d] p-6 rounded-2xl border border-[#00ff9d]/20">
-              <h3 className="text-lg font-bold mb-4">Bridge Transactions</h3>
-              <div className="space-y-3">
-                {comparisonData.comparison.networkAnalysis.bridgeEdges.map(
-                  (edge, i) => (
-                    <motion.div
-                      key={i}
-                      whileHover={{ scale: 1.02 }}
-                      className="p-4 bg-[#00ff9d]/5 rounded-lg border border-[#00ff9d]/10"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="font-mono">
-                          {edge.from} → {edge.to}
-                        </div>
-                        <div className="text-[#00ff9d]">
-                          ${edge.totalAmount.toLocaleString()}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="bg-[#0d0d0d] p-6 rounded-2xl border border-[#00ff9d]/20">
-              <h3 className="text-lg font-bold mb-4">Temporal Patterns</h3>
-              {comparisonData.comparison.temporalAnalysis.overlap ? (
-                <div className="space-y-4">
-                  <InfoCard
-                    icon={<FiClock />}
-                    label="Overlap Period"
-                    value={`${new Date(
-                      comparisonData.comparison.temporalAnalysis.overlap.start
-                    ).toLocaleDateString()} - ${new Date(
-                      comparisonData.comparison.temporalAnalysis.overlap.end
-                    ).toLocaleDateString()}`}
-                  />
-                  <InfoCard
-                    icon={<FiActivity />}
-                    label="Pattern Similarity"
-                    value={`${comparisonData.comparison.temporalAnalysis.similarity.toFixed(
-                      2
-                    )}%`}
-                  />
+            <div>
+              <p className="label mb-1.5 flex items-center gap-1.5"><FiGlobe /> Common countries</p>
+              {c.geography.commonCountries.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {c.geography.commonCountries.map((cc) => (
+                    <span key={cc} className={clsx("rounded-md px-2 py-0.5 text-xs", c.geography.commonHighRisk.includes(cc) ? "bg-sev-critical/10 text-sev-critical ring-1 ring-sev-critical/25" : "bg-white/[0.05] text-slate-300")} title={countryName(cc)}>
+                      {flag(cc)} {cc}
+                    </span>
+                  ))}
                 </div>
               ) : (
-                <div className="text-gray-400">
-                  No temporal patterns detected
-                </div>
+                <p className="text-slate-500">None</p>
               )}
             </div>
           </div>
-        </Section>
+        </Card>
       </div>
-    </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="Shared accounts" subtitle="Accounts that appear in both cases" icon={<FiUsers />} />
+          {c.sharedAccounts.length ? (
+            <div className="overflow-x-auto pb-2">
+              <table className="w-full min-w-[460px] text-sm">
+                <thead>
+                  <tr className="border-y border-white/[0.06] bg-white/[0.02] text-left text-[11px] uppercase tracking-wider text-slate-500">
+                    <th className="px-5 py-2 font-semibold">Account</th>
+                    <th className="px-3 py-2 text-right font-semibold text-accent">Case A</th>
+                    <th className="px-5 py-2 text-right font-semibold text-cyan-glow">Case B</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {c.sharedAccounts.map((s) => (
+                    <tr key={s.account} className="border-b border-white/[0.04]">
+                      <td className="px-5 py-2.5 font-mono text-white">{s.account}</td>
+                      {[s.caseA, s.caseB].map((p, i) => (
+                        <td key={i} className={clsx("py-2.5 text-right text-xs", i ? "px-5" : "px-3")}>
+                          <div className="font-mono text-slate-200">↓{formatMoney(p.inflow, undefined, true)} ↑{formatMoney(p.outflow, undefined, true)}</div>
+                          <div style={{ color: SEVERITY[p.level].color }}>risk {p.score}</div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No shared accounts" className="!py-8" />
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader title="Shared identifiers" subtitle="Same email, phone or IP used in both cases" icon={<FiLink />} />
+          {c.sharedIdentifiers.length ? (
+            <div className="space-y-2 px-5 pb-5">
+              {c.sharedIdentifiers.map((s, i) => (
+                <div key={i} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="label">{s.label}</span>
+                    <span className="truncate font-mono text-sm text-white">{s.value}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5 font-mono text-xs">
+                    {s.accountsA.map((x) => <span key={`a${x}`} className="rounded bg-accent/10 px-1.5 py-0.5 text-accent">A · {x}</span>)}
+                    {s.accountsB.map((x) => <span key={`b${x}`} className="rounded bg-cyan-glow/10 px-1.5 py-0.5 text-cyan-glow">B · {x}</span>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No shared identifiers" className="!py-8" />
+          )}
+        </Card>
+      </div>
+
+      <Card className="mt-6">
+        <CardHeader title="Cross-case money flows" subtitle="Funds received in one case and moved on in the other" icon={<FiArrowRight />} />
+        {c.crossCaseFlows.length ? (
+          <div className="overflow-x-auto pb-2">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-y border-white/[0.06] bg-white/[0.02] text-left text-[11px] uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-2 font-semibold">Direction</th>
+                  <th className="px-3 py-2 font-semibold">Path</th>
+                  <th className="px-3 py-2 text-right font-semibold">In → Out</th>
+                  <th className="px-5 py-2 text-right font-semibold">Gap</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.crossCaseFlows.slice(0, 30).map((f, i) => (
+                  <tr key={i} className="border-b border-white/[0.04]">
+                    <td className="px-5 py-2.5"><span className="rounded-md bg-white/[0.05] px-2 py-0.5 font-mono text-xs text-slate-300">{f.direction}</span></td>
+                    <td className="px-3 py-2.5 font-mono text-xs">
+                      <span className="text-slate-300">{f.path[0]}</span>
+                      <span className="mx-1.5 text-slate-600">→</span>
+                      <span className="rounded bg-sev-high/10 px-1.5 py-0.5 text-sev-high">{f.path[1]}</span>
+                      <span className="mx-1.5 text-slate-600">→</span>
+                      <span className="text-slate-300">{f.path[2]}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-xs text-slate-200">{formatMoney(f.amountIn, undefined, true)} → {formatMoney(f.amountOut, undefined, true)}</td>
+                    <td className="px-5 py-2.5 text-right text-xs text-slate-400">
+                      {f.gapHours === null ? "—" : (
+                        <span className={clsx("inline-flex items-center gap-1", f.gapHours >= 0 && f.gapHours <= 24 && "text-sev-high")}>
+                          <FiClock /> {f.gapHours < 0 ? "before" : f.gapHours < 48 ? `${f.gapHours}h` : `${Math.round(f.gapHours / 24)}d`}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="No cross-case flows" description="No account receives funds in one case and sends them in the other." className="!py-8" />
+        )}
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader title="Combined network" subtitle="Accounts from both cases - shared accounts in pink" icon={<FiShare2 />} />
+        <div className="px-3 pb-3 sm:px-5 sm:pb-5">
+          <NetworkGraph nodes={c.network.nodes} edges={c.network.edges.map((e) => ({ ...e, flagged: e.cases === "AB" }))} colorMode="membership" height={520} />
+        </div>
+      </Card>
+    </PageContainer>
   );
 };
 
-const Section = ({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="space-y-6"
-  >
-    <div className="flex items-center space-x-3 text-xl font-bold border-b border-[#00ff9d]/30 pb-2">
-      <span className="text-[#00ff9d]">{icon}</span>
-      <span>{title}</span>
-    </div>
-    {children}
-  </motion.div>
-);
-
-const InfoCard = ({
-  icon,
-  label,
-  value,
-  unit,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  unit?: string;
-}) => (
-  <motion.div
-    whileHover={{ y: -3 }}
-    className="p-4 bg-[#00ff9d]/5 rounded-xl border border-[#00ff9d]/10"
-  >
-    <div className="flex items-center space-x-3">
-      <div className="text-[#00ff9d]">{icon}</div>
-      <div>
-        <div className="text-sm text-gray-400">{label}</div>
-        <div className="text-xl font-mono">
-          {value}{" "}
-          {unit && <span className="text-sm text-gray-400">{unit}</span>}
-        </div>
-      </div>
-    </div>
-  </motion.div>
-);
-
-const MetadataSection = ({
-  icon,
-  title,
-  items,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  items: string[];
-}) => (
-  <div className="space-y-2">
-    <div className="flex items-center space-x-2 text-[#00ff9d]">
-      {icon}
-      <span className="font-semibold">{title}</span>
-    </div>
-    {items.length > 0 ? (
-      items.map((item, i) => (
-        <div key={i} className="font-mono text-sm text-gray-300 pl-6">
-          {item}
-        </div>
-      ))
-    ) : (
-      <div className="text-gray-400 pl-6">None found</div>
-    )}
-  </div>
-);
+export default CompareResults;

@@ -1,260 +1,149 @@
-const Case = require("../models/Case");
-const Account = require("../models/Account");
-const Transaction = require("../models/Transaction");
-const parseCSV = require("../utils/csvParser");
-const { detectAnomalies } = require("../utils/anomalyDetector");
-const { compareCases } = require("../utils/caseComparator");
+const service = require("../services/caseService");
 
-exports.processSingleCase = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        error: "No file uploaded. Please select a CSV file.",
-        details: ["Ensure a CSV file is selected before uploading."],
-      });
-    }
-
-    const csvData = await parseCSV(req.file.path);
-
-    if (!csvData || csvData.length === 0) {
-      return res.status(400).json({
-        error: "The CSV file is empty or contains no valid data.",
-        details: ["Make sure the file is not empty and has valid rows."],
-        suggestion:
-          "Please check your file and ensure it contains transaction data.",
-      });
-    }
-
-    const firstRow = csvData[0];
-    const headers = Object.keys(firstRow).map((h) => h.toLowerCase());
-
-    const requiredFields = ["fromaccount", "toaccount", "amount"];
-    const missingFields = requiredFields.filter(
-      (field) =>
-        !headers.some((header) => header.includes(field.replace("account", "")))
-    );
-
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        error: "Your CSV file is missing required columns.",
-        details: missingFields.map((field) => `Missing column: ${field}`),
-        found: headers,
-        suggestion:
-          "Please ensure your CSV contains columns for: fromAccount, toAccount, and amount.",
-      });
-    }
-
-    const newCase = await Case.create({ caseId: `CASE-${Date.now()}` });
-
-    for (const row of csvData) {
-      const formattedRow = Object.fromEntries(
-        Object.entries(row).map(([k, v]) => [k.toLowerCase(), v])
-      );
-
-      if (formattedRow.accountnumber || formattedRow.accountholder) {
-        try {
-          const account = await Account.create({
-            accountNumber: formattedRow.accountnumber,
-            accountHolder: formattedRow.accountholder || "Unknown",
-            accountType: formattedRow.accounttype || "Unknown",
-            metadata: {
-              mobile: formattedRow.mobile,
-              ipAddress: formattedRow.ipaddress,
-              email: formattedRow.email,
-            },
-            caseId: newCase._id,
-          });
-          newCase.accounts.push(account._id);
-        } catch (accountErr) {
-          console.warn("Skipping account creation:", accountErr.message);
-        }
-      }
-
-      const transaction = await Transaction.create({
-        fromAccount: formattedRow.fromaccount || formattedRow.from,
-        toAccount: formattedRow.toaccount || formattedRow.to,
-        amount: parseFloat(formattedRow.amount),
-        date: new Date(formattedRow.date || Date.now()),
-        caseId: newCase._id,
-        metadata: {
-          email: formattedRow.email,
-          phone: formattedRow.phone,
-          ipAddress: formattedRow.ipaddress || formattedRow.ip,
-          ipCountry: formattedRow["metadata.ipcountry"],
-        },
-      });
-
-      newCase.transactions.push(transaction._id);
-    }
-
-    await newCase.save();
-    const anomalies = await detectAnomalies(newCase._id);
-
-    res.status(200).json({
-      caseId: newCase._id,
-      anomalies,
-    });
-  } catch (err) {
-    console.error("💥 CSV Processing Error:", {
-      name: err.name,
-      message: err.message,
-      details: err.details || [],
-      stack: err.stack,
-    });
-
-    if (err.name === "ValidationError") {
-      const errors = Object.values(err.errors).map((e) => e.message);
-      return res.status(400).json({
-        error: "There are issues with your CSV data format.",
-        details: errors,
-        suggestion:
-          "Please check that your amounts are numbers and dates are in valid format (YYYY-MM-DD).",
-      });
-    }
-
-    res.status(500).json({
-      error:
-        "Failed to process your CSV file. Please check the file format and try again.",
-      details: err.details || [
-        "Ensure all amounts are numeric",
-        "Dates should be in YYYY-MM-DD format",
-        "No rows should be empty",
-        "Columns: fromAccount, toAccount, and amount are required",
-      ],
-      technical:
-        process.env.NODE_ENV === "development" ? err.message : undefined,
-    });
-  }
+const csvEscape = (v) => {
+  if (v === undefined || v === null) return "";
+  const s = v instanceof Date ? v.toISOString() : String(v);
+  // Neutralise spreadsheet formula injection.
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
-exports.getAllCases = async (req, res) => {
-  try {
-    const cases = await Case.find().populate("accounts transactions");
-    res.status(200).json(cases);
-  } catch (err) {
-    res.status(500).json({ error: "Server error: " + err.message });
+exports.uploadCase = async (req, res) => {
+  const file = req.file || req.files?.csvFile?.[0];
+  if (!file) {
+    return res.status(400).json({
+      error: "No file uploaded. Please choose a CSV file.",
+      details: ["Send the file in a multipart form field named \"csvFile\"."],
+    });
   }
+  const created = await service.createCaseFromCsv({
+    buffer: file.buffer,
+    filename: file.originalname,
+    owner: req.owner,
+    name: req.body?.name,
+    description: req.body?.description,
+  });
+  res.status(201).json({
+    id: created._id,
+    caseId: created.caseId,
+    name: created.name,
+    riskScore: created.riskScore,
+    riskLevel: created.riskLevel,
+    stats: created.stats,
+    warnings: created.warnings,
+  });
 };
 
-exports.getCaseById = async (req, res) => {
-  try {
-    const caseData = await Case.findById(req.params.caseId).populate(
-      "accounts transactions linkedCases"
-    );
-    if (!caseData) return res.status(404).json({ error: "Case not found" });
-    res.status(200).json(caseData);
-  } catch (err) {
-    res.status(500).json({ error: "Server error: " + err.message });
+exports.uploadPair = async (req, res) => {
+  const files = req.files || [];
+  if (files.length !== 2) {
+    return res.status(400).json({ error: "Upload exactly two CSV files to compare." });
   }
+  const created = [];
+  for (const file of files) {
+    created.push(
+      await service.createCaseFromCsv({ buffer: file.buffer, filename: file.originalname, owner: req.owner })
+    );
+  }
+  res.status(201).json({ caseA: created[0]._id, caseB: created[1]._id });
+};
+
+exports.listCases = async (req, res) => {
+  res.json(await service.listCases(req.owner));
+};
+
+exports.getCase = async (req, res) => {
+  res.json(await service.getCase(req.params.id, req.owner));
+};
+
+exports.getTransactions = async (req, res) => {
+  res.json(await service.getTransactions(req.params.id, req.owner));
+};
+
+exports.updateCase = async (req, res) => {
+  res.json(await service.updateCase(req.params.id, req.owner, req.body || {}));
 };
 
 exports.deleteCase = async (req, res) => {
-  try {
-    const deletedCase = await Case.findByIdAndDelete(req.params.caseId);
-    if (!deletedCase) return res.status(404).json({ error: "Case not found" });
-
-    await Account.deleteMany({ caseId: deletedCase._id });
-    await Transaction.deleteMany({ caseId: deletedCase._id });
-
-    res.status(200).json({ message: "Case deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: "Server error: " + err.message });
-  }
+  await service.deleteCase(req.params.id, req.owner);
+  res.status(204).end();
 };
 
-exports.getCaseTransactions = async (req, res) => {
-  try {
-    const transactions = await Transaction.find({ caseId: req.params.caseId });
-    res.status(200).json(transactions);
-  } catch (err) {
-    res.status(500).json({ error: "Server error: " + err.message });
-  }
-};
-
-exports.getCaseAnomalies = async (req, res) => {
-  try {
-    const anomalies = await detectAnomalies(req.params.caseId);
-    res.status(200).json(anomalies);
-  } catch (err) {
-    res.status(500).json({ error: "Server error: " + err.message });
-  }
-};
-
-// Helper: Process a single CSV file
-const processSingleCSV = async (file) => {
-  try {
-    const data = await parseCSV(file.path);
-    const newCase = await Case.create({
-      caseId: `CASE-${Date.now()}`,
-      description: "CSV Upload",
-    });
-
-    for (const row of data) {
-      const account = await Account.create({
-        accountNumber: row.accountNumber,
-        accountHolder: row.accountHolder,
-        accountType: row.accountType,
-        metadata: {
-          mobile: row.mobile,
-          ipAddress: row.ipAddress,
-          email: row.email,
-          ipCountry: row.metadata?.ipCountry,
-        },
-        caseId: newCase._id,
-      });
-
-      const transaction = await Transaction.create({
-        fromAccount: row.fromAccount,
-        toAccount: row.toAccount,
-        amount: parseFloat(row.amount),
-        date: new Date(row.date || Date.now()),
-        caseId: newCase._id,
-        metadata: {
-          ipCountry: row["metadata.ipCountry"],
-        },
-      });
-
-      newCase.accounts.push(account._id);
-      newCase.transactions.push(transaction._id);
-    }
-
-    await newCase.save();
-    await detectAnomalies(newCase._id);
-
-    return Case.findById(newCase._id).populate("accounts transactions").lean();
-  } catch (err) {
-    throw new Error(`CSV processing failed: ${err.message}`);
-  }
-};
-
-exports.processInterlinkCases = async (req, res) => {
-  try {
-    if (!req.files || req.files.length !== 2) {
-      return res.status(400).json({ error: "Exactly 2 CSV files required" });
-    }
-
-    const case1 = await processSingleCSV(req.files[0]);
-    const case2 = await processSingleCSV(req.files[1]);
-
-    const comparisonResult = await compareCases(case1._id, case2._id);
-    res.status(200).json({
-      case1: case1._id,
-      case2: case2._id,
-      comparison: comparisonResult,
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Interlink failed: " + err.message });
-  }
+exports.reviewTransaction = async (req, res) => {
+  res.json(await service.reviewTransaction(req.params.txId, req.owner, req.body?.status));
 };
 
 exports.compareCases = async (req, res) => {
-  try {
-    const comparisonResult = await compareCases(
-      req.params.caseId1,
-      req.params.caseId2
-    );
-    res.status(200).json(comparisonResult);
-  } catch (err) {
-    res.status(500).json({ error: "Comparison failed: " + err.message });
+  const a = req.params.a || req.body?.caseA;
+  const b = req.params.b || req.body?.caseB;
+  if (!a || !b) return res.status(400).json({ error: "Two case ids are required." });
+  res.json(await service.compare(a, b, req.owner));
+};
+
+exports.exportCase = async (req, res) => {
+  const format = req.query.format === "json" ? "json" : "csv";
+  const caseData = await service.getCase(req.params.id, req.owner);
+  const transactions = await service.getTransactions(req.params.id, req.owner);
+  const base = `${caseData.caseId}`;
+
+  if (format === "json") {
+    res.setHeader("Content-Disposition", `attachment; filename="${base}-report.json"`);
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      case: {
+        caseId: caseData.caseId,
+        name: caseData.name,
+        status: caseData.status,
+        notes: caseData.notes,
+        sourceFile: caseData.sourceFile,
+        riskScore: caseData.riskScore,
+        riskLevel: caseData.riskLevel,
+        stats: caseData.stats,
+        createdAt: caseData.createdAt,
+      },
+      summary: caseData.analysis.summary,
+      findings: caseData.analysis.findings,
+      accounts: caseData.analysis.accountRisk,
+      transactions,
+    });
   }
+
+  const header = ["reference", "date", "fromAccount", "toAccount", "amount", "currency", "country", "description", "suspicious", "flags", "reviewStatus"];
+  const lines = [header.join(",")];
+  for (const t of transactions) {
+    lines.push(
+      [t.reference, t.date, t.fromAccount, t.toAccount, t.amount, t.currency, t.country, t.description, t.isSuspicious ? "yes" : "no", (t.flags || []).join("|"), t.reviewStatus]
+        .map(csvEscape)
+        .join(",")
+    );
+  }
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${base}-transactions.csv"`);
+  res.send(lines.join("\n"));
+};
+
+exports.reanalyze = async (req, res) => {
+  res.json(await service.reanalyzeCase(req.params.id, req.owner, { thresholds: req.body?.thresholds }));
+};
+
+exports.trace = async (req, res) => {
+  res.json(
+    await service.traceCase(req.params.id, req.owner, {
+      account: req.query.account,
+      direction: req.query.direction,
+      hops: req.query.hops,
+    })
+  );
+};
+
+exports.report = async (req, res) => {
+  res.json(await service.reportForCase(req.params.id, req.owner));
+};
+
+exports.links = async (req, res) => {
+  res.json(await service.crossCaseLinks(req.params.id, req.owner));
+};
+
+exports.search = async (req, res) => {
+  res.json(await service.searchEntities(req.owner, req.query.q));
 };

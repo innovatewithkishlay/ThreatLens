@@ -1,41 +1,78 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import { Home } from "./pages/Home";
-import { PluginAnalysis } from "./pages/PluginAnalysis";
-import { InterlinkAnalysis } from "./pages/InterlinkAnalysis";
-import { Results } from "./pages/Results";
-import { CompareResults } from "./pages/CompareResults";
-import { CyberToast } from "./components/UI/CyberToast";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import ProButtonDemo from "./pages/Test";
-import ContributePage from "./pages/ContributePage";
-import CookieBanner from "./components/UI/CookieBanner";
-import CookiePolicy from "./pages/CookiePolicy";
-export const App = () => {
-  return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/plugin" element={<PluginAnalysis />} />
-          <Route path="/interlink" element={<InterlinkAnalysis />} />
-          <Route path="/results/:caseId" element={<Results />} />
-          <Route
-            path="/compare-results/:case1Id/:case2Id"
-            element={<CompareResults />}
-          />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/pro" element={<ProButtonDemo />} />
-          <Route path="/contribute" element={<ContributePage />} />
-          <Route path="/cookie-policy" element={<CookiePolicy />} />
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { WorkspaceProvider } from "./context/WorkspaceContext";
+import { AppShell } from "./components/layout/AppShell";
+import { CookieBanner } from "./components/layout/CookieBanner";
+import { PageLoader } from "./components/ui/Spinner";
+import Home from "./pages/Home";
 
-          
-          {/* 404 route*/}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <CyberToast />
-        <CookieBanner />
-      </Router>
-    </AuthProvider>
-  );
+const Analyze = lazy(() => import("./pages/Analyze"));
+const Cases = lazy(() => import("./pages/Cases"));
+const CaseView = lazy(() => import("./pages/CaseView"));
+const CaseReport = lazy(() => import("./pages/CaseReport"));
+const Watchlist = lazy(() => import("./pages/Watchlist"));
+const Compare = lazy(() => import("./pages/Compare"));
+const CompareResults = lazy(() => import("./pages/CompareResults"));
+const Contribute = lazy(() => import("./pages/Contribute"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const JoinWorkspace = lazy(() => import("./pages/JoinWorkspace"));
+
+const LegacyResults = () => {
+  const { caseId } = useParams();
+  return <Navigate to={`/cases/${caseId}`} replace />;
 };
+const LegacyCompare = () => {
+  const { case1Id, case2Id } = useParams();
+  return <Navigate to={`/compare/${case1Id}/${case2Id}`} replace />;
+};
+
+export const App = () => (
+  <WorkspaceProvider>
+    <BrowserRouter>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<Home />} />
+            <Route path="analyze" element={<Analyze />} />
+            <Route path="cases" element={<Cases />} />
+            <Route path="cases/:id" element={<CaseView />} />
+            <Route path="cases/:id/report" element={<CaseReport />} />
+            <Route path="watchlist" element={<Watchlist />} />
+            <Route path="join/:key" element={<JoinWorkspace />} />
+            <Route path="compare" element={<Compare />} />
+            <Route path="compare/:a/:b" element={<CompareResults />} />
+            <Route path="contribute" element={<Contribute />} />
+            <Route path="privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="cookie-policy" element={<CookiePolicy />} />
+
+            {/* Routes from earlier versions */}
+            <Route path="plugin" element={<Navigate to="/analyze" replace />} />
+            <Route path="interlink" element={<Navigate to="/compare" replace />} />
+            <Route path="results/:caseId" element={<LegacyResults />} />
+            <Route path="compare-results/:case1Id/:case2Id" element={<LegacyCompare />} />
+
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </Suspense>
+      <CookieBanner />
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "#0f141c",
+            color: "#e2e8f0",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "14px",
+            fontSize: "14px",
+          },
+          success: { iconTheme: { primary: "#00ff9d", secondary: "#05070a" } },
+          error: { iconTheme: { primary: "#ff4d6d", secondary: "#05070a" } },
+        }}
+      />
+    </BrowserRouter>
+  </WorkspaceProvider>
+);

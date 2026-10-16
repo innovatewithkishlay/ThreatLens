@@ -1,9 +1,104 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-:root {
-  --cyber-bg: #0a001a;
-  --cyber-card: #17002e;
-  --cyber-border: rgba(0, 255, 157, 0.15);
-  --cyber-accent: #00ff9d;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ink-950 text-slate-200 font-sans;
+    min-height: 100vh;
+  }
+  ::selection {
+    background: rgba(0, 255, 157, 0.25);
+    color: #fff;
+  }
+  *:focus-visible {
+    outline: 2px solid #00ff9d;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1f2836;
+    border-radius: 999px;
+    border: 2px solid #05070a;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a3546;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-ink-850/70 backdrop-blur-xl border border-white/[0.06] shadow-card;
+  }
+  .card {
+    @apply rounded-2xl bg-ink-850/80 border border-white/[0.06] shadow-card backdrop-blur-xl;
+  }
+  .card-hover {
+    @apply transition-all duration-300 hover:border-accent/30 hover:bg-ink-800/80;
+  }
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500;
+  }
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent via-emerald-300 to-cyan-glow bg-clip-text text-transparent;
+  }
+  .input {
+    @apply w-full rounded-xl bg-ink-900 border border-white/[0.08] px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 transition focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(0, 255, 157, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 157, 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .prose-tl h2 {
+    @apply font-display text-xl font-semibold text-white mt-10 mb-3;
+  }
+  .prose-tl h3 {
+    @apply font-semibold text-slate-100 mt-6 mb-2;
+  }
+  .prose-tl p {
+    @apply text-slate-400 leading-relaxed mb-4;
+  }
+  .prose-tl ul {
+    @apply list-disc pl-5 space-y-1.5 text-slate-400 mb-4;
+  }
+  .prose-tl a {
+    @apply text-accent hover:underline;
+  }
+  .prose-tl strong {
+    @apply text-slate-200;
+  }
+}
+
+@media print {
+  @page {
+    margin: 16mm;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  main > div {
+    padding: 0 !important;
+    max-width: none !important;
+  }
 }

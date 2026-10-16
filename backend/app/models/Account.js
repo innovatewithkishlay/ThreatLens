@@ -1,35 +1,28 @@
 const mongoose = require("mongoose");
 
 const accountSchema = new mongoose.Schema({
-  accountNumber: {
-    type: String,
-    required: true,
-  },
-  accountHolder: {
-    type: String,
-    required: true,
-  },
-  accountType: {
-    type: String,
-    enum: ["personal", "business"],
-    required: true,
-  },
+  caseId: { type: mongoose.Schema.Types.ObjectId, ref: "Case", required: true },
+  accountNumber: { type: String, required: true },
+  accountHolder: String,
+  accountType: String,
+  openedAt: Date,
+  country: String,
   metadata: {
-    mobile: { type: String },
-    ipAddress: { type: String },
-    email: { type: String },
+    email: String,
+    mobile: String,
+    ipAddress: String,
   },
-  caseId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Case",
-    required: true,
+  stats: {
+    inflow: { type: Number, default: 0 },
+    outflow: { type: Number, default: 0 },
+    sent: { type: Number, default: 0 },
+    received: { type: Number, default: 0 },
   },
-  isFlagged: {
-    type: Boolean,
-    default: false,
-  },
+  riskScore: { type: Number, default: 0 },
+  riskLevel: { type: String, default: "low" },
+  reasons: [String],
 });
 
-accountSchema.index({ accountNumber: 1, caseId: 1 }, { unique: true });
+accountSchema.index({ caseId: 1, accountNumber: 1 }, { unique: true });
 
 module.exports = mongoose.model("Account", accountSchema);

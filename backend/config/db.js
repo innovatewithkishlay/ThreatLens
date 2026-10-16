@@ -1,14 +1,11 @@
 const mongoose = require("mongoose");
-require("dotenv").config();
+const env = require("./env");
 
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.DB_URI);
-    console.log("MongoDB connected successfully");
-  } catch (err) {
-    console.error("MongoDB connection error:", err);
-    process.exit(1);
-  }
+const connectDB = async (uri = env.dbUri) => {
+  mongoose.set("strictQuery", true);
+  await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
+  if (!env.isTest) console.log("MongoDB connected");
+  return mongoose.connection;
 };
 
 module.exports = connectDB;
