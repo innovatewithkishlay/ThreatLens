@@ -16,16 +16,6 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       chunkSizeWarningLimit: 900,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            react: ["react", "react-dom", "react-router-dom"],
-            charts: ["recharts"],
-            d3: ["d3", "topojson-client"],
-            motion: ["framer-motion"],
-          },
-        },
-      },
     },
   };
 });

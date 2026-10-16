@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { WorkspaceProvider } from "./context/WorkspaceContext";
@@ -6,19 +6,20 @@ import { AppShell } from "./components/layout/AppShell";
 import { CookieBanner } from "./components/layout/CookieBanner";
 import { PageLoader } from "./components/ui/Spinner";
 import Home from "./pages/Home";
+import { lazyPage } from "./lib/lazyPage";
 
-const Analyze = lazy(() => import("./pages/Analyze"));
-const Cases = lazy(() => import("./pages/Cases"));
-const CaseView = lazy(() => import("./pages/CaseView"));
-const CaseReport = lazy(() => import("./pages/CaseReport"));
-const Watchlist = lazy(() => import("./pages/Watchlist"));
-const Compare = lazy(() => import("./pages/Compare"));
-const CompareResults = lazy(() => import("./pages/CompareResults"));
-const Contribute = lazy(() => import("./pages/Contribute"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const JoinWorkspace = lazy(() => import("./pages/JoinWorkspace"));
+const Analyze = lazyPage(() => import("./pages/Analyze"));
+const Cases = lazyPage(() => import("./pages/Cases"));
+const CaseView = lazyPage(() => import("./pages/CaseView"));
+const CaseReport = lazyPage(() => import("./pages/CaseReport"));
+const Watchlist = lazyPage(() => import("./pages/Watchlist"));
+const Compare = lazyPage(() => import("./pages/Compare"));
+const CompareResults = lazyPage(() => import("./pages/CompareResults"));
+const Contribute = lazyPage(() => import("./pages/Contribute"));
+const PrivacyPolicy = lazyPage(() => import("./pages/PrivacyPolicy"));
+const CookiePolicy = lazyPage(() => import("./pages/CookiePolicy"));
+const NotFound = lazyPage(() => import("./pages/NotFound"));
+const JoinWorkspace = lazyPage(() => import("./pages/JoinWorkspace"));
 
 const LegacyResults = () => {
   const { caseId } = useParams();
