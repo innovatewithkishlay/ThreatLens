@@ -260,8 +260,17 @@ const CaseView = () => {
               <Button variant="secondary" size="sm" icon={<FiSliders />} onClick={() => setSettingsOpen(true)} aria-label="Detection settings" title="Detection settings" />
             </div>
             <div className="flex gap-2">
-              <LinkButton to={api.exportUrl(data._id, "csv")} download variant="secondary" size="sm" icon={<FiDownload />}>CSV</LinkButton>
-              <LinkButton to={api.exportUrl(data._id, "json")} download variant="secondary" size="sm" icon={<FiDownload />}>JSON</LinkButton>
+              {(["csv", "json"] as const).map((f) => (
+                <Button
+                  key={f}
+                  variant="secondary"
+                  size="sm"
+                  icon={<FiDownload />}
+                  onClick={() => api.downloadExport(data._id, f).catch((e) => toast.error((e as Error).message))}
+                >
+                  {f.toUpperCase()}
+                </Button>
+              ))}
               <Button variant="secondary" size="sm" icon={<FiPrinter />} onClick={() => window.print()} aria-label="Print report" />
               <Button variant="danger" size="sm" icon={<FiTrash2 />} onClick={() => setConfirmDelete(true)} aria-label="Delete case" />
             </div>
