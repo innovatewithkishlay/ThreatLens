@@ -120,12 +120,12 @@ const CaseReport = () => {
         <section className="mt-8">
           <h2 className="border-b border-slate-200 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Subjects</h2>
           <div className="overflow-x-auto">
-            <table className="mt-3 w-full min-w-[560px] text-left text-sm">
+            <table className="mt-3 w-full text-left text-sm">
               <thead>
                 <tr className="text-[10px] uppercase tracking-wider text-slate-500">
                   <th className="py-1.5 pr-3">Account</th>
                   <th className="py-1.5 pr-3">Holder / identifiers</th>
-                  <th className="py-1.5 pr-3 text-right">In / Out</th>
+                  <th className="hidden py-1.5 pr-3 text-right sm:table-cell">In / Out</th>
                   <th className="py-1.5 text-right">Risk</th>
                 </tr>
               </thead>
@@ -135,10 +135,10 @@ const CaseReport = () => {
                     <td className="py-2 pr-3 font-mono text-xs font-semibold text-slate-900">{s.account}</td>
                     <td className="py-2 pr-3">
                       <div className="text-slate-900">{s.holder}{s.country ? ` (${s.country})` : ""}</div>
-                      <div className="text-xs text-slate-500">{[s.email, s.phone, s.ip].filter(Boolean).join(" · ")}</div>
+                      <div className="break-all text-xs text-slate-500">{[s.email, s.phone, s.ip].filter(Boolean).join(" · ")}</div>
                       {s.reasons.length > 0 && <div className="mt-0.5 text-xs text-slate-500">{s.reasons.join(", ")}</div>}
                     </td>
-                    <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs">{formatMoney(s.inflow, cur, true)} / {formatMoney(s.outflow, cur, true)}</td>
+                    <td className="hidden whitespace-nowrap py-2 pr-3 text-right font-mono text-xs sm:table-cell">{formatMoney(s.inflow, cur, true)} / {formatMoney(s.outflow, cur, true)}</td>
                     <td className="py-2 text-right font-bold" style={{ color: s.score >= 75 ? SEVERITY.critical.color : s.score >= 50 ? SEVERITY.high.color : "#334155" }}>{s.score}</td>
                   </tr>
                 ))}
