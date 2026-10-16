@@ -81,19 +81,27 @@ export const FlowDiagram = ({ trace, currency, onSelect }: { trace: TraceResult;
 
     const cols = new Map<number, LNode[]>();
     nodes.forEach((n) => cols.set(n.col, [...(cols.get(n.col) || []), n]));
+    // Each node gets at least a label-sized slot so small flows never overlap.
+    const MIN_SLOT = 30;
     let k = Infinity;
     cols.forEach((list) => {
       const total = list.reduce((s, n) => s + n.value, 0);
       k = Math.min(k, (height - GAP * (list.length - 1)) / Math.max(total, 1));
     });
+    let svgHeight = height;
+    cols.forEach((list) => {
+      list.forEach((n) => (n.h = Math.max(3, n.value * k)));
+      const total = list.reduce((s, n) => s + Math.max(n.h, MIN_SLOT), 0) + GAP * (list.length - 1);
+      svgHeight = Math.max(svgHeight, total);
+    });
     cols.forEach((list) => {
       list.sort((a, b) => b.value - a.value);
-      const total = list.reduce((s, n) => s + Math.max(3, n.value * k), 0) + GAP * (list.length - 1);
-      let y = (height - total) / 2;
+      const total = list.reduce((s, n) => s + Math.max(n.h, MIN_SLOT), 0) + GAP * (list.length - 1);
+      let y = (svgHeight - total) / 2;
       list.forEach((n) => {
-        n.h = Math.max(3, n.value * k);
-        n.y = y;
-        y += n.h + GAP;
+        const slot = Math.max(n.h, MIN_SLOT);
+        n.y = y + (slot - n.h) / 2;
+        y += slot + GAP;
       });
     });
 
@@ -115,7 +123,7 @@ export const FlowDiagram = ({ trace, currency, onSelect }: { trace: TraceResult;
       inOff.set(l.to.id, (inOff.get(l.to.id) || 0) + l.w);
     });
 
-    return { nodes: [...nodes.values()], links, height, hidden, depth };
+    return { nodes: [...nodes.values()], links, height: svgHeight, hidden, depth };
   }, [trace, width]);
 
   const related = useMemo(() => {
