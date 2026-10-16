@@ -25,6 +25,9 @@ const corsMiddleware = cors({
     return callback(null, false);
   },
   credentials: true,
+  allowedHeaders: ["Content-Type", "X-Workspace-Key"],
+  exposedHeaders: ["X-Workspace-Key", "Content-Disposition"],
+  maxAge: 600,
 });
 
 const apiLimiter = rateLimit({

@@ -218,6 +218,12 @@ test("API end-to-end", async (t) => {
     const fresh = await teammate.post("/api/workspace/new").expect(200);
     assert.notEqual(fresh.body.key, mine.body.key);
     assert.equal((await teammate.get("/api/cases").expect(200)).body.length, 0);
+    // Cross-origin clients can use the header instead of the cookie.
+    const viaHeader = await request(app).get("/api/cases").set("X-Workspace-Key", mine.body.key).expect(200);
+    assert.equal(viaHeader.body.length, mine.body.cases);
+    assert.equal(viaHeader.headers["x-workspace-key"], mine.body.key);
+    const badHeader = await request(app).get("/api/cases").set("X-Workspace-Key", "not-a-key").expect(200);
+    assert.equal(badHeader.body.length, 0);
     // Forged cookies are ignored.
     const forged = await request(app).get("/api/cases").set("Cookie", `tl_workspace=${mine.body.key}`).expect(200);
     assert.equal(forged.body.length, 0);

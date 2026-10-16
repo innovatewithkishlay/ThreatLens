@@ -26,6 +26,54 @@ export const http = axios.create({
   timeout: 120_000,
 });
 
+// ---- Workspace key -------------------------------------------------------
+// The workspace key travels in a header so the app also works when the API is
+// hosted on a different domain (where browsers block third-party cookies).
+const KEY_STORAGE = "tl_workspace_key";
+const KEY_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+const readKey = () => {
+  try {
+    const k = localStorage.getItem(KEY_STORAGE);
+    return k && KEY_PATTERN.test(k) ? k : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveWorkspaceKey = (key: string) => {
+  if (!KEY_PATTERN.test(key)) return;
+  try {
+    localStorage.setItem(KEY_STORAGE, key);
+  } catch {
+    /* storage unavailable - fall back to the cookie */
+  }
+};
+
+// On first visit ask the server which workspace this browser has (an existing
+// cookie-based one, or a fresh key) before sending any other request.
+let keyReady: Promise<void> | null = null;
+const ensureKey = () => {
+  if (readKey()) return Promise.resolve();
+  if (!keyReady) {
+    keyReady = axios
+      .get(`${API_BASE}/api/workspace`, { withCredentials: true, timeout: 120_000 })
+      .then((res) => saveWorkspaceKey(res.data?.key || res.headers["x-workspace-key"]))
+      .catch(() => undefined)
+      .finally(() => {
+        keyReady = null;
+      });
+  }
+  return keyReady;
+};
+
+http.interceptors.request.use(async (config) => {
+  await ensureKey();
+  const key = readKey();
+  if (key) config.headers.set("X-Workspace-Key", key);
+  return config;
+});
+
 export class ApiError extends Error {
   status?: number;
   details: string[];
@@ -46,9 +94,11 @@ export const toApiError = (err: unknown): ApiError => {
     const e = err as AxiosError<{ error?: string; details?: string[]; found?: string[] }>;
     if (!e.response) {
       return new ApiError(
-        "Cannot reach the ThreatLens server. Make sure the backend is running.",
+        "Cannot reach the ThreatLens server.",
         undefined,
-        ["Start it with: cd backend && npm run dev"]
+        API_BASE
+          ? ["The server may be waking up after being idle - please try again in a minute."]
+          : ["Make sure the backend is running: cd backend && npm run dev"]
       );
     }
     const data = e.response.data;
@@ -72,8 +122,16 @@ const call = async <T>(p: Promise<{ data: T }>): Promise<T> => {
 
 export const api = {
   workspace: () => call<WorkspaceInfo>(http.get("/api/workspace")),
-  joinWorkspace: (key: string) => call<WorkspaceInfo>(http.post("/api/workspace/join", { key })),
-  newWorkspace: () => call<WorkspaceInfo>(http.post("/api/workspace/new")),
+  joinWorkspace: (key: string) =>
+    call<WorkspaceInfo>(http.post("/api/workspace/join", { key })).then((w) => {
+      saveWorkspaceKey(w.key);
+      return w;
+    }),
+  newWorkspace: () =>
+    call<WorkspaceInfo>(http.post("/api/workspace/new")).then((w) => {
+      saveWorkspaceKey(w.key);
+      return w;
+    }),
 
   listCases: () => call<CaseSummary[]>(http.get("/api/cases")),
   getCase: (id: string) => call<CaseDetail>(http.get(`/api/cases/${id}`)),
@@ -97,7 +155,23 @@ export const api = {
   removeWatchlist: (id: string) => call<void>(http.delete(`/api/watchlist/${id}`)),
   clearWatchlist: () => call<void>(http.delete("/api/watchlist")),
 
-  exportUrl: (id: string, format: "csv" | "json") => `${API_BASE}/api/cases/${id}/export?format=${format}`,
+  /** Download a case export (sent with the workspace header, so not a plain link). */
+  downloadExport: async (id: string, format: "csv" | "json") => {
+    try {
+      const res = await http.get(`/api/cases/${id}/export`, { params: { format }, responseType: "blob" });
+      const name = /filename="([^"]+)"/.exec(res.headers["content-disposition"] || "")?.[1] || `case-${id}.${format}`;
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      throw toApiError(err);
+    }
+  },
 
   uploadCase: (file: File, opts: { name?: string; onProgress?: (pct: number) => void } = {}) => {
     const form = new FormData();
