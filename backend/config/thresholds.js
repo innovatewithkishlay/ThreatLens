@@ -14,7 +14,7 @@ module.exports = {
   RAPID_SUCCESSIVE: { count: 5, minutes: 10 },
 
   // Fan-in (smurfing) / fan-out (dispersion) detection.
-  SMURFING: { minCounterparties: 5, windowHours: 48 },
+  SMURFING: { minCounterparties: 6, windowHours: 48 },
 
   // Pass-through: funds received and forwarded within this window.
   PASS_THROUGH: { windowHours: 1, minRatio: 0.8, minAmount: 5000 },
@@ -28,6 +28,16 @@ module.exports = {
 
   // Round-number transactions.
   ROUND_AMOUNT: { multiple: 1000, minAmount: 5000, minCount: 3 },
+
+  // Dormant account reactivation: no activity for `days`, then at least
+  // `minAmount` moved within `windowDays`.
+  DORMANT: { days: 30, windowDays: 7, minAmount: 10000 },
+
+  // Out-of-pattern transfer: far larger than the sender's own median.
+  OUTLIER: { minHistory: 5, multiple: 10, minAmount: 5000 },
+
+  // Benford's law first-digit test (needs a reasonable sample).
+  BENFORD: { minCount: 300 },
 
   // Transactions between these hours (inclusive, 24h clock, as recorded).
   UNUSUAL_HOURS: [0, 4],

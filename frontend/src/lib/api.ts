@@ -1,5 +1,12 @@
 import axios, { AxiosError } from "axios";
 import type {
+  CaseLink,
+  CaseReport,
+  SearchResult,
+  Thresholds,
+  TraceResult,
+  WatchlistEntry,
+  WatchlistType,
   CaseDetail,
   CaseStatus,
   CaseSummary,
@@ -7,7 +14,8 @@ import type {
   ReviewStatus,
   Transaction,
   UploadResult,
-  User,
+  WorkspaceInfo,
+  ChecklistItem,
 } from "./types";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
@@ -63,20 +71,32 @@ const call = async <T>(p: Promise<{ data: T }>): Promise<T> => {
 };
 
 export const api = {
-  authConfig: () => call<{ googleEnabled: boolean }>(http.get("/auth/config")),
-  me: () => call<{ user: User | null }>(http.get("/auth/me")),
-  logout: () => call<{ message: string }>(http.post("/auth/logout")),
-  googleLoginUrl: () => `${API_BASE}/auth/google`,
+  workspace: () => call<WorkspaceInfo>(http.get("/api/workspace")),
+  joinWorkspace: (key: string) => call<WorkspaceInfo>(http.post("/api/workspace/join", { key })),
+  newWorkspace: () => call<WorkspaceInfo>(http.post("/api/workspace/new")),
 
   listCases: () => call<CaseSummary[]>(http.get("/api/cases")),
   getCase: (id: string) => call<CaseDetail>(http.get(`/api/cases/${id}`)),
   getTransactions: (id: string) => call<Transaction[]>(http.get(`/api/cases/${id}/transactions`)),
-  updateCase: (id: string, patch: Partial<{ name: string; description: string; notes: string; status: CaseStatus }>) =>
+  updateCase: (id: string, patch: Partial<{ name: string; description: string; notes: string; status: CaseStatus; reportDraft: string; checklist: ChecklistItem[] }>) =>
     call<CaseSummary>(http.patch(`/api/cases/${id}`, patch)),
   deleteCase: (id: string) => call<void>(http.delete(`/api/cases/${id}`)),
   reviewTransaction: (caseId: string, txId: string, status: ReviewStatus) =>
     call<Transaction>(http.patch(`/api/cases/${caseId}/transactions/${txId}`, { status })),
   compare: (a: string, b: string) => call<ComparisonResponse>(http.get(`/api/cases/compare/${a}/${b}`)),
+  reanalyze: (id: string, thresholds?: Partial<Thresholds> | null) => call<CaseDetail>(http.post(`/api/cases/${id}/reanalyze`, thresholds === undefined ? {} : { thresholds })),
+  trace: (id: string, account: string, direction: "forward" | "backward", hops = 6) =>
+    call<TraceResult>(http.get(`/api/cases/${id}/trace`, { params: { account, direction, hops } })),
+  report: (id: string) => call<CaseReport>(http.get(`/api/cases/${id}/report`)),
+  links: (id: string) => call<CaseLink[]>(http.get(`/api/cases/${id}/links`)),
+  search: (q: string, signal?: AbortSignal) => call<SearchResult>(http.get("/api/search", { params: { q }, signal })),
+
+  watchlist: () => call<WatchlistEntry[]>(http.get("/api/watchlist")),
+  addWatchlist: (entries: { type?: WatchlistType; value: string; note?: string; source?: string }[]) =>
+    call<{ added: number; skipped: number }>(http.post("/api/watchlist", { entries })),
+  removeWatchlist: (id: string) => call<void>(http.delete(`/api/watchlist/${id}`)),
+  clearWatchlist: () => call<void>(http.delete("/api/watchlist")),
+
   exportUrl: (id: string, format: "csv" | "json") => `${API_BASE}/api/cases/${id}/export?format=${format}`,
 
   uploadCase: (file: File, opts: { name?: string; onProgress?: (pct: number) => void } = {}) => {

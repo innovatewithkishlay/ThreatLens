@@ -1,45 +1,38 @@
 const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
 const env = require("../../config/env");
 
-const GUEST_COOKIE = "tl_guest";
-const AUTH_COOKIE = "jwt";
+const WORKSPACE_COOKIE = "tl_workspace";
+const LEGACY_COOKIE = "tl_guest";
+const KEY_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
-const cookieBase = () => ({
+const cookieOptions = () => ({
   httpOnly: true,
   secure: env.isProduction,
   sameSite: "lax",
   path: "/",
+  signed: true,
+  maxAge: 5 * 365 * 24 * 3600 * 1000,
 });
 
+const setWorkspace = (res, key) => res.cookie(WORKSPACE_COOKIE, key, cookieOptions());
+
 /**
- * Attach `req.user` (signed-in) and `req.owner` (who owns new/visible cases).
- * Visitors who are not signed in get a signed, random guest id so their
- * cases stay private to their browser.
+ * ThreatLens has no user accounts. Every browser gets a private workspace,
+ * identified by a random key stored in a signed cookie. Sharing the key gives
+ * someone else (or another device) access to the same workspace.
  */
 const identify = (req, res, next) => {
-  const token = req.cookies?.[AUTH_COOKIE];
-  if (token) {
-    try {
-      const payload = jwt.verify(token, env.jwtSecret);
-      req.user = { id: payload.id, email: payload.email, name: payload.name };
-    } catch {
-      res.clearCookie(AUTH_COOKIE, cookieBase());
-    }
+  let key = req.signedCookies?.[WORKSPACE_COOKIE] || req.signedCookies?.[LEGACY_COOKIE];
+  if (!key || !KEY_PATTERN.test(key)) {
+    key = crypto.randomUUID();
+    setWorkspace(res, key);
+  } else if (!req.signedCookies?.[WORKSPACE_COOKIE]) {
+    setWorkspace(res, key);
   }
-
-  let guestId = req.signedCookies?.[GUEST_COOKIE];
-  if (!guestId || !/^[a-f0-9-]{36}$/.test(guestId)) {
-    guestId = crypto.randomUUID();
-    res.cookie(GUEST_COOKIE, guestId, {
-      ...cookieBase(),
-      signed: true,
-      maxAge: 365 * 24 * 3600 * 1000,
-    });
-  }
-  req.guestId = guestId;
-  req.owner = req.user ? { kind: "user", id: String(req.user.id) } : { kind: "guest", id: guestId };
+  req.workspace = key;
+  // Stored data uses { kind, id } so ownership checks stay explicit.
+  req.owner = { kind: "guest", id: key };
   next();
 };
 
-module.exports = { identify, cookieBase, GUEST_COOKIE, AUTH_COOKIE };
+module.exports = { identify, setWorkspace, KEY_PATTERN, WORKSPACE_COOKIE };

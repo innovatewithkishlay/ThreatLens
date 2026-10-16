@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 process.env.NODE_ENV = "test";
-process.env.JWT_SECRET = "test-secret";
+process.env.COOKIE_SECRET = "test-secret";
 
 const mongoose = require("mongoose");
 const request = require("supertest");
@@ -91,6 +91,19 @@ test("API end-to-end", async (t) => {
     await agent.patch(`/api/cases/${idA}/transactions/${txs.body[0]._id}`).send({ status: "bogus" }).expect(400);
   });
 
+  await t.test("investigation checklist", async () => {
+    const c = await agent.get(`/api/cases/${idA}`).expect(200);
+    assert.ok(c.body.checklist.length >= 5);
+    assert.ok(c.body.checklist.every((x) => x.auto && !x.done));
+    const list = c.body.checklist.map((x, i) => (i === 0 ? { ...x, done: true } : x));
+    list.push({ text: "Call the bank's fraud desk", done: false });
+    const res = await agent.patch(`/api/cases/${idA}`).send({ checklist: list }).expect(200);
+    assert.equal(res.body.checklist[0].done, true);
+    assert.ok(res.body.checklist[0].doneAt);
+    assert.equal(res.body.checklist.at(-1).text, "Call the bank's fraud desk");
+    assert.match(res.body.checklist.at(-1).key, /^custom-/);
+  });
+
   await t.test("compares cases", async () => {
     const res = await agent.get(`/api/cases/compare/${idA}/${idB}`).expect(200);
     const c = res.body.comparison;
@@ -118,17 +131,97 @@ test("API end-to-end", async (t) => {
     assert.ok(res.body.caseA && res.body.caseB);
   });
 
+  await t.test("fund tracing", async () => {
+    const fwd = await agent.get(`/api/cases/${idA}/trace?account=ACC1002&direction=forward`).expect(200);
+    assert.ok(fwd.body.nodes.some((n) => n.account === "ACC1015"));
+    assert.ok(fwd.body.endpoints.length > 0);
+    const back = await agent.get(`/api/cases/${idA}/trace?account=ACC1018&direction=backward`).expect(200);
+    assert.ok(back.body.endpoints.some((n) => n.account.startsWith("ACC200")));
+    await agent.get(`/api/cases/${idA}/trace?account=NOPE`).expect(404);
+    await agent.get(`/api/cases/${idA}/trace`).expect(400);
+    await other.get(`/api/cases/${idA}/trace?account=ACC1002`).expect(404);
+  });
+
+  await t.test("SAR report draft", async () => {
+    const r = await agent.get(`/api/cases/${idA}/report`).expect(200);
+    assert.ok(r.body.narrative.length > 500);
+    assert.ok(r.body.subjects.length > 0);
+    await agent.patch(`/api/cases/${idA}`).send({ reportDraft: "Edited narrative" }).expect(200);
+    const again = await agent.get(`/api/cases/${idA}/report`).expect(200);
+    assert.equal(again.body.draft, "Edited narrative");
+  });
+
+  await t.test("cross-case links and entity search", async () => {
+    const links = await agent.get(`/api/cases/${idA}/links`).expect(200);
+    assert.ok(links.body.length >= 1);
+    assert.ok(links.body[0].matches.some((m) => m.kind === "account" && m.account === "ACC1015"));
+    assert.ok(links.body[0].matches.some((m) => m.kind === "email"));
+    const s = await agent.get(`/api/search?q=acc1015`).expect(200);
+    assert.equal(s.body.entities[0].account, "ACC1015");
+    assert.ok(s.body.entities[0].appearances.length >= 2);
+    const none = await other.get(`/api/search?q=acc1015`).expect(200);
+    assert.equal(none.body.entities.length, 0);
+    const short = await agent.get(`/api/search?q=a`).expect(200);
+    assert.equal(short.body.entities.length, 0);
+    await agent.get(`/api/search?q=${encodeURIComponent("(.*[")}`).expect(200);
+  });
+
+  await t.test("watchlist screening and re-analysis", async () => {
+    const before = await agent.get(`/api/cases/${idA}`).expect(200);
+    assert.ok(!before.body.analysis.findings.some((f) => f.type === "watchlist"));
+    const txs = await agent.get(`/api/cases/${idA}/transactions`).expect(200);
+    const reviewedId = txs.body[0]._id;
+
+    const add = await agent
+      .post("/api/watchlist")
+      .send({ entries: [{ value: "ACC1015", note: "Known mule" }, { value: "ACC1015" }, { value: "" }] })
+      .expect(201);
+    assert.deepEqual(add.body, { added: 1, skipped: 2 });
+    const list = await agent.get("/api/watchlist").expect(200);
+    assert.equal(list.body[0].type, "account");
+    assert.equal((await other.get("/api/watchlist").expect(200)).body.length, 0);
+
+    const re = await agent.post(`/api/cases/${idA}/reanalyze`).send({ thresholds: { HIGH_VALUE: 20000 } }).expect(200);
+    assert.equal(re.body.checklist[0].done, true, "checklist progress survives re-analysis");
+    assert.ok(re.body.checklist.some((x) => x.key === "watchlist"), "new tasks are added for new findings");
+    assert.ok(re.body.analysis.findings.some((f) => f.type === "watchlist" && f.subjects[0] === "ACC1015"));
+    assert.equal(re.body.settings.HIGH_VALUE, 20000);
+    assert.ok(re.body.analysis.summary.byType.highValue > before.body.analysis.summary.byType.highValue);
+    const after = await agent.get(`/api/cases/${idA}/transactions`).expect(200);
+    assert.equal(after.body.find((x) => x._id === reviewedId).reviewStatus, "cleared");
+
+    // Reset to defaults
+    const reset = await agent.post(`/api/cases/${idA}/reanalyze`).send({ thresholds: null }).expect(200);
+    assert.equal(reset.body.settings.HIGH_VALUE, 50000);
+
+    await agent.delete(`/api/watchlist/${list.body[0]._id}`).expect(204);
+    await other.delete(`/api/watchlist/${list.body[0]._id}`).expect(404);
+  });
+
   await t.test("deletes", async () => {
     await agent.delete(`/api/cases/${idB}`).expect(204);
     await agent.get(`/api/cases/${idB}`).expect(404);
     await agent.get("/api/cases/not-an-id").expect(404);
   });
 
-  await t.test("auth endpoints work without Google configured", async () => {
-    const cfg = await agent.get("/auth/config").expect(200);
-    assert.equal(cfg.body.googleEnabled, false);
-    const me = await agent.get("/auth/me").expect(200);
-    assert.equal(me.body.user, null);
+  await t.test("workspace keys share access without accounts", async () => {
+    const mine = await agent.get("/api/workspace").expect(200);
+    assert.match(mine.body.key, /^[a-f0-9-]{36}$/);
+    assert.ok(mine.body.cases >= 1);
+    // A teammate joins with the key and sees the same cases.
+    const teammate = request.agent(app);
+    await teammate.post("/api/workspace/join").send({ key: "nope" }).expect(400);
+    const joined = await teammate.post("/api/workspace/join").send({ key: mine.body.key.toUpperCase() }).expect(200);
+    assert.equal(joined.body.cases, mine.body.cases);
+    assert.equal((await teammate.get("/api/cases").expect(200)).body.length, mine.body.cases);
+    // Starting a fresh workspace hides them again.
+    const fresh = await teammate.post("/api/workspace/new").expect(200);
+    assert.notEqual(fresh.body.key, mine.body.key);
+    assert.equal((await teammate.get("/api/cases").expect(200)).body.length, 0);
+    // Forged cookies are ignored.
+    const forged = await request(app).get("/api/cases").set("Cookie", `tl_workspace=${mine.body.key}`).expect(200);
+    assert.equal(forged.body.length, 0);
     await agent.get("/api/nope").expect(404);
+    await agent.get("/auth/google").expect((r) => assert.notEqual(r.status, 302));
   });
 });

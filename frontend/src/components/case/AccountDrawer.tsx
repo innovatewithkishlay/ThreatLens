@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { FiMail, FiMonitor, FiPhone } from "react-icons/fi";
+import { FiCrosshair, FiEye, FiMail, FiMonitor, FiPhone } from "react-icons/fi";
+import { Button } from "../ui/Button";
 import type { Account, AccountRisk, Finding, Transaction } from "../../lib/types";
 import { formatDate, formatDateTime, formatMoney } from "../../lib/format";
 import { countryName, flag } from "../../lib/countries";
@@ -16,6 +17,8 @@ export const AccountDrawer = ({
   transactions,
   currency,
   onAccount,
+  onTrace,
+  onWatchlist,
 }: {
   accountId: string | null;
   onClose: () => void;
@@ -25,6 +28,8 @@ export const AccountDrawer = ({
   transactions: Transaction[];
   currency?: string;
   onAccount: (id: string) => void;
+  onTrace?: (id: string) => void;
+  onWatchlist?: (id: string) => void;
 }) => {
   const related = useMemo(() => (accountId ? findings.filter((f) => f.accounts.includes(accountId)) : []), [findings, accountId]);
   const txs = useMemo(
@@ -57,6 +62,11 @@ export const AccountDrawer = ({
               )}
               {risk && <SeverityBadge level={risk.level} className="mt-2" />}
             </div>
+          </div>
+
+          <div className="flex gap-2">
+            {onTrace && <Button size="sm" icon={<FiCrosshair />} onClick={() => onTrace(accountId)}>Trace funds</Button>}
+            {onWatchlist && <Button size="sm" variant="secondary" icon={<FiEye />} onClick={() => onWatchlist(accountId)}>Add to watchlist</Button>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

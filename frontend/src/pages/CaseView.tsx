@@ -16,9 +16,17 @@ import {
   FiList,
   FiPrinter,
   FiShare2,
+  FiSliders,
   FiTrash2,
   FiUsers,
+  FiCrosshair,
+  FiFileText as FiReport,
 } from "react-icons/fi";
+import { FundTrace } from "../components/case/FundTrace";
+import { DetectionSettings } from "../components/case/DetectionSettings";
+import { CaseLinks } from "../components/case/CaseLinks";
+import { Checklist } from "../components/case/Checklist";
+import { BenfordChart } from "../components/viz/BenfordChart";
 import { PageContainer } from "../components/layout/AppShell";
 import { Card, CardHeader, EmptyState } from "../components/ui/Card";
 import { Button, LinkButton } from "../components/ui/Button";
@@ -42,7 +50,7 @@ import { countryName, flag } from "../lib/countries";
 import type { CaseDetail, CaseStatus, Finding, Transaction } from "../lib/types";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
-const TAB_KEYS = ["overview", "findings", "network", "transactions", "accounts", "geography", "notes"] as const;
+const TAB_KEYS = ["overview", "findings", "network", "trace", "transactions", "accounts", "geography", "notes"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
 const CaseView = () => {
@@ -61,6 +69,8 @@ const CaseView = () => {
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [traceAccount, setTraceAccount] = useState<string | null>(null);
 
   const tabParam = params.get("tab") as TabKey | null;
   const tab: TabKey = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : "overview";
@@ -88,6 +98,8 @@ const CaseView = () => {
         setData(c);
         setNotes(c.notes || "");
         setTransactions(t);
+        const acc = new URLSearchParams(window.location.search).get("account");
+        if (acc) setDrawerAccount(acc);
       })
       .catch((e) => !cancelled && setError(e));
     return () => {
@@ -138,6 +150,19 @@ const CaseView = () => {
   };
 
   const openAccount = (acc: string) => setDrawerAccount(acc);
+  const openTrace = (acc: string) => {
+    setDrawerAccount(null);
+    setTraceAccount(acc);
+    setTab("trace");
+  };
+  const addToWatchlist = async (acc: string) => {
+    try {
+      const res = await api.addWatchlist([{ type: "account", value: acc, note: `Added from ${data.caseId}`, source: "case" }]);
+      toast.success(res.added ? `${acc} added to watchlist` : `${acc} is already on the watchlist`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
   const showFindingTx = (f: Finding) => {
     setTxFilter({ ids: f.transactions, label: f.label });
     setTab("transactions");
@@ -157,10 +182,11 @@ const CaseView = () => {
     { key: "overview", label: "Overview", icon: <FiGrid /> },
     { key: "findings", label: "Findings", icon: <FiAlertTriangle />, count: analysis.findings.length },
     { key: "network", label: "Network", icon: <FiShare2 /> },
+    { key: "trace", label: "Trace funds", icon: <FiCrosshair /> },
     { key: "transactions", label: "Transactions", icon: <FiList />, count: stats.transactionCount },
     { key: "accounts", label: "Accounts", icon: <FiUsers />, count: stats.accountCount },
     { key: "geography", label: "Geography", icon: <FiGlobe /> },
-    { key: "notes", label: "Notes", icon: <FiEdit2 /> },
+    { key: "notes", label: "Workflow", icon: <FiEdit2 />, count: data.checklist?.length ? data.checklist.filter((c) => !c.done).length : undefined },
   ];
 
   return (
@@ -210,7 +236,12 @@ const CaseView = () => {
                 <span className="flex items-center gap-1.5"><FiCalendar className="text-slate-500" /> {formatDate(stats.dateRange.start)} – {formatDate(stats.dateRange.end)}</span>
               )}
               {data.sourceFile && <span className="flex items-center gap-1.5"><FiFileText className="text-slate-500" /> {data.sourceFile}</span>}
-              <span className="text-slate-500">Analysed {formatDate(data.createdAt, false)}</span>
+              <span className="text-slate-500">Analysed {formatDate(data.analyzedAt || data.createdAt, false)}</span>
+              {data.thresholds && (
+                <button onClick={() => setSettingsOpen(true)} className="no-print rounded-md bg-violet-400/10 px-2 py-0.5 text-xs text-violet-300 ring-1 ring-violet-400/30">
+                  Custom detection settings
+                </button>
+              )}
             </div>
           </div>
           <div className="no-print flex flex-wrap items-center gap-2 lg:flex-col lg:items-end">
@@ -224,6 +255,10 @@ const CaseView = () => {
                 <option key={s} value={s}>{STATUS[s].label}</option>
               ))}
             </select>
+            <div className="flex gap-2">
+              <LinkButton to={`/cases/${data._id}/report`} size="sm" icon={<FiReport />}>SAR report</LinkButton>
+              <Button variant="secondary" size="sm" icon={<FiSliders />} onClick={() => setSettingsOpen(true)} aria-label="Detection settings" title="Detection settings" />
+            </div>
             <div className="flex gap-2">
               <LinkButton to={api.exportUrl(data._id, "csv")} download variant="secondary" size="sm" icon={<FiDownload />}>CSV</LinkButton>
               <LinkButton to={api.exportUrl(data._id, "json")} download variant="secondary" size="sm" icon={<FiDownload />}>JSON</LinkButton>
@@ -242,6 +277,8 @@ const CaseView = () => {
           </ul>
         </div>
       )}
+
+      <div className="no-print"><CaseLinks caseId={data._id} refreshKey={data.analyzedAt} /></div>
 
       {/* KPIs */}
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -316,13 +353,29 @@ const CaseView = () => {
             <Card className="lg:col-span-2">
               <CardHeader title="Time-of-day profile" subtitle="Transfers per hour - off-hours highlighted" icon={<FiActivity />} />
               <div className="px-3 pb-4">
-                <HourlyChart data={analysis.activity.hourly} height={360} />
+                <HourlyChart data={analysis.activity.hourly} height={260} />
               </div>
             </Card>
-            <Card>
+            {analysis.benford && analysis.benford.n >= 30 && (
+              <Card>
+                <CardHeader title="Benford's law test" subtitle="Forensic check of first-digit distribution" icon={<FiActivity />} />
+                <div className="px-5 pb-5">
+                  <BenfordChart data={analysis.benford} minCount={data.settings?.BENFORD?.minCount} />
+                </div>
+              </Card>
+            )}
+            <Card className={analysis.benford && analysis.benford.n >= 30 ? "lg:col-span-3" : ""}>
               <CardHeader title="Typologies detected" icon={<FiList />} />
-              <div className="px-5 pb-5">
-                {typologyBars.length ? <HorizontalBars data={typologyBars} /> : <p className="text-sm text-slate-500">None.</p>}
+              <div className={analysis.benford && analysis.benford.n >= 30 ? "grid gap-x-8 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3 [&>*]:mb-0" : "px-5 pb-5"}>
+                {typologyBars.length ? (
+                  analysis.benford && analysis.benford.n >= 30 ? (
+                    [0, 1, 2].map((col) => <HorizontalBars key={col} data={typologyBars.filter((_, i) => i % 3 === col)} />)
+                  ) : (
+                    <HorizontalBars data={typologyBars} />
+                  )
+                ) : (
+                  <p className="text-sm text-slate-500">None.</p>
+                )}
               </div>
             </Card>
           </div>
@@ -365,12 +418,23 @@ const CaseView = () => {
                   </span>
                   <div className="flex gap-2">
                     <Button size="sm" variant="secondary" onClick={() => openAccount(selectedAccount)}>Account details</Button>
+                    <Button size="sm" variant="secondary" icon={<FiCrosshair />} onClick={() => openTrace(selectedAccount)}>Trace funds</Button>
                     <Button size="sm" variant="secondary" onClick={() => { setTxFilter({ account: selectedAccount, label: `Account ${selectedAccount}` }); setTab("transactions"); }}>Transfers</Button>
                   </div>
                 </div>
               )}
             </div>
           </Card>
+        )}
+
+        {tab === "trace" && (
+          <FundTrace
+            caseId={data._id}
+            accounts={analysis.accountRisk}
+            initialAccount={traceAccount || analysis.findings.find((f) => f.type === "passThrough" || f.type === "fanIn")?.subjects[0] || analysis.accountRisk[0]?.account}
+            currency={currency}
+            onAccount={openAccount}
+          />
         )}
 
         {tab === "transactions" && (
@@ -428,32 +492,40 @@ const CaseView = () => {
         )}
 
         {tab === "notes" && (
-          <Card className="p-5">
-            <label htmlFor="notes" className="label mb-2 block">Investigator notes</label>
-            <textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={10000}
-              rows={12}
-              className="input resize-y font-mono leading-relaxed"
-              placeholder={"Record hypotheses, evidence and next steps.\n\n- Contacted bank re: ACC1015\n- SAR drafted"}
-            />
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-slate-500">{notes.length.toLocaleString()} / 10,000</span>
-              <Button
-                loading={savingNotes}
-                disabled={notes === data.notes}
-                onClick={async () => {
-                  setSavingNotes(true);
-                  if (await update({ notes })) toast.success("Notes saved");
-                  setSavingNotes(false);
-                }}
-              >
-                Save notes
-              </Button>
-            </div>
-          </Card>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="p-5">
+              <h3 className="mb-1 font-display font-semibold text-white">Investigation checklist</h3>
+              <p className="mb-4 text-xs text-slate-500">Next steps suggested from the findings. Progress is saved to the case.</p>
+              <Checklist caseId={data._id} items={data.checklist || []} onChange={(items) => setData((d) => (d ? { ...d, checklist: items } : d))} />
+            </Card>
+            <Card className="p-5">
+              <label htmlFor="notes" className="mb-1 block font-display font-semibold text-white">Investigator notes</label>
+              <p className="mb-4 text-xs text-slate-500">Hypotheses, evidence and decisions. Included in the SAR report.</p>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={10000}
+                rows={14}
+                className="input resize-y font-mono leading-relaxed"
+                placeholder={"Record hypotheses, evidence and next steps.\n\n- Contacted bank re: ACC1015\n- SAR drafted"}
+              />
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs text-slate-500">{notes.length.toLocaleString()} / 10,000</span>
+                <Button
+                  loading={savingNotes}
+                  disabled={notes === data.notes}
+                  onClick={async () => {
+                    setSavingNotes(true);
+                    if (await update({ notes })) toast.success("Notes saved");
+                    setSavingNotes(false);
+                  }}
+                >
+                  Save notes
+                </Button>
+              </div>
+            </Card>
+          </div>
         )}
       </motion.div>
 
@@ -466,6 +538,18 @@ const CaseView = () => {
         transactions={transactions}
         currency={currency}
         onAccount={setDrawerAccount}
+        onTrace={openTrace}
+        onWatchlist={addToWatchlist}
+      />
+
+      <DetectionSettings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        data={data}
+        onUpdated={(c) => {
+          setData(c);
+          api.getTransactions(c._id).then(setTransactions).catch(() => undefined);
+        }}
       />
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete case?">

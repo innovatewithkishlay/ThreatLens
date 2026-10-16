@@ -4,6 +4,10 @@ import {
   FiArrowRight,
   FiClock,
   FiCpu,
+  FiCrosshair,
+  FiEye,
+  FiFileText,
+  FiSearch,
   FiDownload,
   FiGitMerge,
   FiGlobe,
@@ -34,13 +38,13 @@ const TYPOLOGIES = [
   { icon: <FiActivity />, title: "Pass-through mules", text: "Funds received and forwarded within minutes." },
   { icon: <FiUsers />, title: "Shared identities", text: "Distinct accounts sharing an email, phone or IP address." },
   { icon: <FiGlobe />, title: "High-risk jurisdictions", text: "Exposure to FATF-monitored countries, mapped worldwide." },
-  { icon: <FiClock />, title: "Behavioural anomalies", text: "Bursts, off-hours activity and repeated counterparties." },
-  { icon: <FiShield />, title: "New-account abuse", text: "Large transfers soon after an account is opened." },
+  { icon: <FiClock />, title: "Behavioural anomalies", text: "Dormant accounts waking up, out-of-pattern transfers, bursts and off-hours activity." },
+  { icon: <FiShield />, title: "Benford's law forensics", text: "Statistical first-digit test that exposes fabricated or manipulated amounts." },
 ];
 
 const STEPS = [
   { icon: <FiUploadCloud />, title: "Upload a CSV", text: "Drop any transaction export. Column names are detected automatically - sender, beneficiary, amount, date and more." },
-  { icon: <FiCpu />, title: "13 detectors run", text: "Every transfer is scored against proven AML typologies. Accounts get explainable risk scores." },
+  { icon: <FiCpu />, title: "17 detectors run", text: "Every transfer is scored against proven AML typologies. Accounts get explainable risk scores." },
   { icon: <FiActivity />, title: "Investigate", text: "Explore the money network, timeline and world map. Review transactions and record case notes." },
   { icon: <FiDownload />, title: "Report", text: "Export flagged transactions as CSV, the full analysis as JSON, or print a case report." },
 ];
@@ -93,7 +97,7 @@ const Home = () => {
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="card grid grid-cols-2 divide-white/[0.06] md:grid-cols-4 md:divide-x">
           {[
-            ["13", "Detection typologies"],
+            ["17", "Detection typologies"],
             ["25k", "Transactions per case"],
             ["< 5s", "Typical analysis time"],
             ["100%", "Explainable scores"],
@@ -150,6 +154,34 @@ const Home = () => {
               </div>
               <h3 className="mt-5 font-semibold text-white">{s.title}</h3>
               <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-400">{s.text}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Investigator toolkit */}
+      <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="font-mono text-xs uppercase tracking-[0.2em] text-accent">Investigator toolkit</div>
+          <h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">Solves the slow parts of every investigation</h2>
+          <p className="mt-4 text-slate-400">The work that usually takes days of spreadsheets now takes minutes.</p>
+        </div>
+        <div className="mt-12 grid gap-4 md:grid-cols-2">
+          {[
+            { icon: <FiCrosshair />, title: "Trace funds hop by hop", text: "Pick any account and see exactly where its money ended up - or where incoming money came from - across up to 10 hops, replayed in time order.", tag: "Follow the money" },
+            { icon: <FiFileText />, title: "Draft the SAR in one click", text: "A structured who / what / when / where / why / how narrative is generated from the evidence. Edit it, save it, print it to PDF.", tag: "Hours → minutes" },
+            { icon: <FiEye />, title: "Watchlist screening", text: "Screen every case against your own list of names, accounts, emails, phones and IPs. Fuzzy name matching catches typos and reordered names.", tag: "Sanctions & blacklists" },
+            { icon: <FiSearch />, title: "Have we seen this before?", text: "Search any entity across all cases with ⌘K. Each case automatically alerts you when its accounts or identifiers appear in other investigations.", tag: "Institutional memory" },
+          ].map((f, i) => (
+            <motion.div key={f.title} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i % 2} className="card card-hover flex gap-5 p-6">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-xl text-accent ring-1 ring-accent/20">{f.icon}</div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold text-white">{f.title}</h3>
+                  <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[11px] text-slate-400">{f.tag}</span>
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">{f.text}</p>
+              </div>
             </motion.div>
           ))}
         </div>

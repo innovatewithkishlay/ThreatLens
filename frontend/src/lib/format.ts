@@ -85,6 +85,10 @@ export const TYPOLOGY_INFO: Record<string, { label: string; help: string }> = {
   newAccount: { label: "New account, large value", help: "Large transfers soon after an account was opened." },
   highRiskGeo: { label: "High-risk jurisdiction", help: "Activity tied to FATF-monitored jurisdictions." },
   sharedIdentity: { label: "Shared identifiers", help: "Different accounts share email, phone or IP." },
+  watchlist: { label: "Watchlist match", help: "Account matches an entry on your watchlist." },
+  dormant: { label: "Dormant reactivation", help: "Long-inactive account suddenly moves large sums." },
+  outlier: { label: "Out-of-pattern transfer", help: "Transfer far larger than the account's usual behaviour." },
+  benford: { label: "Benford's law deviation", help: "Amount distribution suggests fabricated or manipulated values." },
 };
 
 export const typologyLabel = (type: string) => TYPOLOGY_INFO[type]?.label || type;

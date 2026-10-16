@@ -5,12 +5,13 @@ const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
 const env = require("./config/env");
 const { helmetMiddleware, corsMiddleware, apiLimiter } = require("./config/security");
-const passport = require("./config/passport");
 const connectDB = require("./config/db");
 const { identify } = require("./app/middlewares/identify");
 const { notFound, errorHandler } = require("./app/middlewares/errorHandler");
 const caseRoutes = require("./app/routes/caseRoutes");
-const authRoutes = require("./app/routes/auth");
+const workspaceRoutes = require("./app/routes/workspaceRoutes");
+const watchlistRoutes = require("./app/routes/watchlistRoutes");
+const { search } = require("./app/controllers/caseController");
 
 const createApp = () => {
   const app = express();
@@ -21,7 +22,6 @@ const createApp = () => {
   app.use(corsMiddleware);
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser(env.cookieSecret));
-  app.use(passport.initialize());
   app.use(identify);
 
   app.get("/api/health", (req, res) => {
@@ -34,14 +34,16 @@ const createApp = () => {
 
   app.use("/api", apiLimiter);
   app.use("/api/cases", caseRoutes);
-  app.use("/auth", authRoutes);
-  app.use(["/api", "/auth"], notFound);
+  app.use("/api/watchlist", watchlistRoutes);
+  app.get("/api/search", search);
+  app.use("/api/workspace", workspaceRoutes);
+  app.use("/api", notFound);
 
   // Serve the built frontend when it exists (single-service deployment).
   const dist = path.resolve(__dirname, "../frontend/dist");
   if (fs.existsSync(path.join(dist, "index.html"))) {
     app.use(express.static(dist, { maxAge: "1h", index: false }));
-    app.get(/^\/(?!api|auth).*/, (req, res) => res.sendFile(path.join(dist, "index.html")));
+    app.get(/^\/(?!api).*/, (req, res) => res.sendFile(path.join(dist, "index.html")));
   } else {
     app.get("/", (req, res) => res.json({ status: "ThreatLens API operational" }));
   }
@@ -62,7 +64,6 @@ const start = async () => {
   const app = createApp();
   app.listen(env.port, () => {
     console.log(`[threatlens] API listening on http://localhost:${env.port}`);
-    console.log(`[threatlens] Google sign-in ${env.googleEnabled ? "enabled" : "disabled (guest mode only)"}`);
   });
 };
 

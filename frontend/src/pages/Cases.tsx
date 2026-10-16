@@ -16,7 +16,6 @@ import { StatTile } from "../components/ui/StatTile";
 import { api, type ApiError } from "../lib/api";
 import { formatMoney, formatNumber, riskColor, timeAgo } from "../lib/format";
 import type { CaseStatus, CaseSummary } from "../lib/types";
-import { useAuth } from "../context/AuthContext";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const FILTERS: { key: "all" | CaseStatus; label: string }[] = [
@@ -30,7 +29,6 @@ const FILTERS: { key: "all" | CaseStatus; label: string }[] = [
 const Cases = () => {
   useDocumentTitle("Cases");
   const navigate = useNavigate();
-  const { user, googleEnabled, signIn } = useAuth();
   const [cases, setCases] = useState<CaseSummary[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [query, setQuery] = useState("");
@@ -87,7 +85,7 @@ const Cases = () => {
       <PageHeader
         eyebrow="Workspace"
         title="Cases"
-        description={user ? `Investigations saved to ${user.email}.` : "Investigations in this browser's private guest workspace."}
+        description="Investigations in your private workspace. Share the workspace key to collaborate - no account needed."
         actions={
           <>
             {selected.length === 2 && (
@@ -101,13 +99,6 @@ const Cases = () => {
           </>
         }
       />
-
-      {!user && googleEnabled && cases.length > 0 && (
-        <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-2xl border border-accent/20 bg-accent/[0.04] px-5 py-4 sm:flex-row sm:items-center">
-          <p className="text-sm text-slate-300">Sign in to keep these cases across devices - they'll move to your account automatically.</p>
-          <Button size="sm" variant="outline" onClick={signIn}>Sign in with Google</Button>
-        </div>
-      )}
 
       {cases.length === 0 ? (
         <Card>
@@ -197,7 +188,12 @@ const Cases = () => {
                         <div><div className="text-sm font-semibold text-white">{formatMoney(c.stats.totalVolume, c.stats.currency, true)}</div><div className="text-[11px] text-slate-500">volume</div></div>
                       </div>
                       <div className="relative z-10 mt-4 flex items-center justify-between text-xs text-slate-500">
-                        <span>{timeAgo(c.createdAt)}</span>
+                        <span>
+                          {timeAgo(c.createdAt)}
+                          {c.checklist && c.checklist.length > 0 && (
+                            <span className="ml-2 text-slate-600">· {c.checklist.filter((x) => x.done).length}/{c.checklist.length} tasks</span>
+                          )}
+                        </span>
                         <div className="flex items-center gap-1">
                           <label className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-white/[0.05]">
                             <input type="checkbox" checked={isSel} onChange={() => toggle(c._id)} className="accent-[#00ff9d]" />

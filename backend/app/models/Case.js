@@ -32,6 +32,23 @@ const caseSchema = new mongoose.Schema(
     // Full detection output (findings, network, account risk, summary).
     analysis: { type: mongoose.Schema.Types.Mixed, default: {} },
     warnings: [String],
+    // Per-case detection settings (overrides of config/thresholds.js).
+    thresholds: { type: mongoose.Schema.Types.Mixed, default: null },
+    reportDraft: { type: String, maxlength: 50000, default: "" },
+    checklist: {
+      type: [
+        {
+          _id: false,
+          key: String,
+          text: { type: String, maxlength: 300 },
+          done: { type: Boolean, default: false },
+          auto: { type: Boolean, default: false },
+          doneAt: Date,
+        },
+      ],
+      default: [],
+    },
+    analyzedAt: Date,
   },
   { timestamps: true, minimize: false }
 );

@@ -2,8 +2,7 @@ import { LegalPage } from "../components/layout/LegalPage";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const COOKIES = [
-  ["jwt", "Keeps you signed in after Google sign-in.", "7 days", "Essential"],
-  ["tl_guest", "Anonymous, signed identifier that keeps guest cases private to your browser.", "1 year", "Essential"],
+  ["tl_workspace", "Anonymous, signed workspace key that keeps your cases private. No account required.", "5 years", "Essential"],
   ["tl_cookie_notice", "Remembers that you dismissed the cookie notice (local storage).", "Until cleared", "Preference"],
 ];
 
@@ -37,11 +36,11 @@ const CookiePolicy = () => {
       </div>
       <h2>Managing cookies</h2>
       <p>
-        You can clear cookies at any time in your browser settings. Clearing <span className="font-mono">tl_guest</span> will disconnect you from cases created
-        as a guest - sign in first if you want to keep them.
+        You can clear cookies at any time in your browser settings. Clearing <span className="font-mono">tl_workspace</span> disconnects this browser from your
+        workspace - copy your workspace key first (Workspace button in the top bar) so you can reopen it.
       </p>
       <h2>Third parties</h2>
-      <p>When you choose to sign in, Google handles authentication under its own privacy and cookie policies.</p>
+      <p>Fonts are loaded from Google Fonts. No other third-party services are contacted.</p>
     </LegalPage>
   );
 };

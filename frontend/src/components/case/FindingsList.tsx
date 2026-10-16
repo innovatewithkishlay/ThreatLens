@@ -114,7 +114,7 @@ export const FindingsList = ({
   const visible = findings.filter((f) => (sev === "all" || f.severity === sev) && (category === "all" || f.category === category));
 
   if (!findings.length) {
-    return <EmptyState icon="✓" title="No suspicious patterns found" description="None of the 13 detectors fired for this dataset. Review the network and timeline to confirm." />;
+    return <EmptyState icon="✓" title="No suspicious patterns found" description="None of the 17 detectors fired for this dataset. Review the network and timeline to confirm." />;
   }
 
   return (

@@ -2,11 +2,26 @@ export type Severity = "critical" | "high" | "medium" | "low";
 export type CaseStatus = "open" | "investigating" | "escalated" | "closed";
 export type ReviewStatus = "unreviewed" | "suspicious" | "cleared";
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
+export interface WorkspaceInfo {
+  key: string;
+  cases: number;
+  watchlist: number;
+}
+
+export interface ChecklistItem {
+  key: string;
+  text: string;
+  done: boolean;
+  auto: boolean;
+  doneAt?: string;
+}
+
+export interface BenfordResult {
+  n: number;
+  digits: { digit: number; count: number; observed: number; expected: number }[];
+  mad: number;
+  conformity: "close" | "acceptable" | "marginal" | "nonconformity";
+  applicable: boolean;
 }
 
 export interface CaseStats {
@@ -88,6 +103,7 @@ export interface Analysis {
     daily: { date: string; count: number; volume: number; flagged: number }[];
   };
   geography: { country: string; count: number; volume: number; highRisk: boolean; flagged: number }[];
+  benford?: BenfordResult;
   thresholds: { highValue: number; reportingThreshold: number; highRiskCountries: string[] };
   columns?: Record<string, string>;
 }
@@ -105,6 +121,7 @@ export interface CaseSummary {
   createdAt: string;
   updatedAt: string;
   analysis?: { summary: AnalysisSummary };
+  checklist?: ChecklistItem[];
 }
 
 export interface Account {
@@ -121,8 +138,12 @@ export interface Account {
   reasons: string[];
 }
 
-export interface CaseDetail extends Omit<CaseSummary, "analysis"> {
+export interface CaseDetail extends Omit<CaseSummary, "analysis" | "checklist"> {
+  checklist: ChecklistItem[];
   notes: string;
+  settings: Thresholds;
+  thresholds: Partial<Thresholds> | null;
+  analyzedAt?: string;
   warnings: string[];
   analysis: Analysis;
   accounts: Account[];
@@ -203,4 +224,114 @@ export interface ComparisonResponse {
   caseA: ComparisonCase;
   caseB: ComparisonCase;
   comparison: Comparison;
+}
+
+export interface Thresholds {
+  HIGH_VALUE: number;
+  REPORTING_THRESHOLD: number;
+  STRUCTURING_BAND: number;
+  STRUCTURING_MIN_COUNT: number;
+  RAPID_SUCCESSIVE: { count: number; minutes: number };
+  SMURFING: { minCounterparties: number; windowHours: number };
+  PASS_THROUGH: { windowHours: number; minRatio: number; minAmount: number };
+  CIRCULAR: { maxLength: number; maxCycles: number; windowDays: number; minAmount: number; minRatio: number; maxRatio: number };
+  FREQUENT_PAIR_COUNT: number;
+  ROUND_AMOUNT: { multiple: number; minAmount: number; minCount: number };
+  UNUSUAL_HOURS: [number, number];
+  NEW_ACCOUNT_DAYS: number;
+  NEW_ACCOUNT_HIGH_VALUE: number;
+  DORMANT: { days: number; windowDays: number; minAmount: number };
+  OUTLIER: { minHistory: number; multiple: number; minAmount: number };
+  BENFORD: { minCount: number };
+  HIGH_RISK_COUNTRIES: string[];
+}
+
+export interface TraceNode {
+  account: string;
+  hop: number;
+  received: number;
+  passedOn: number;
+  retained: number;
+  firstSeen: string | null;
+  score: number;
+  level: Severity;
+  holder?: string;
+}
+
+export interface TraceEdge {
+  from: string;
+  to: string;
+  amount: number;
+  count: number;
+  hop: number;
+  transactions: string[];
+}
+
+export interface TraceResult {
+  origin: string;
+  direction: "forward" | "backward";
+  maxHops: number;
+  totalTraced: number;
+  nodes: TraceNode[];
+  edges: TraceEdge[];
+  endpoints: TraceNode[];
+  depth: number;
+}
+
+export interface ReportSubject {
+  account: string;
+  holder: string;
+  type?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
+  ip?: string;
+  inflow: number;
+  outflow: number;
+  score: number;
+  reasons: string[];
+}
+
+export interface CaseReport {
+  caseId: string;
+  name: string;
+  generatedAt: string;
+  riskScore: number;
+  riskLevel: Severity;
+  period: { start: string; end: string } | null;
+  totals: { transactions: number; volume: number; flaggedVolume: number; currency?: string };
+  subjects: ReportSubject[];
+  typologies: string[];
+  sections: { key: string; title: string; body: string }[];
+  narrative: string;
+  status: CaseStatus;
+  notes: string;
+  draft: string;
+}
+
+export interface CaseLink {
+  case: { _id: string; caseId: string; name: string; riskScore: number; riskLevel: Severity; createdAt: string };
+  matches: { kind: "account" | "email" | "mobile" | "ipAddress"; account: string; otherAccount: string; value: string }[];
+}
+
+export interface SearchResult {
+  query: string;
+  entities: {
+    account: string;
+    holder?: string;
+    maxScore: number;
+    appearances: { caseId: string; caseRef: string; caseName: string; score: number; level: Severity; email?: string; mobile?: string; ipAddress?: string; inflow?: number; outflow?: number }[];
+  }[];
+  cases: { _id: string; caseId: string; name: string; riskScore: number; riskLevel: Severity }[];
+}
+
+export type WatchlistType = "account" | "name" | "email" | "phone" | "ip";
+
+export interface WatchlistEntry {
+  _id: string;
+  type: WatchlistType;
+  value: string;
+  note?: string;
+  source?: string;
+  createdAt: string;
 }

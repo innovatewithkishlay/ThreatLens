@@ -22,11 +22,8 @@
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.15.1",
-    "multer": "^2.0.0",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "multer": "^2.0.0"
   },
   "devDependencies": {
     "supertest": "^7.1.1"

@@ -2,87 +2,39 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import clsx from "clsx";
-import { FiChevronDown, FiFolder, FiGitPullRequest, FiGithub, FiGitMerge, FiLogOut, FiMenu, FiUploadCloud, FiUser, FiX } from "react-icons/fi";
+import { FiEye, FiFolder, FiGitPullRequest, FiGithub, FiGitMerge, FiKey, FiMenu, FiSearch, FiUploadCloud, FiX } from "react-icons/fi";
+import { SearchPalette } from "./SearchPalette";
 import { Logo } from "./Logo";
-import { useAuth } from "../../context/AuthContext";
-import { useClickOutside } from "../../hooks/useClickOutside";
-import { Button } from "../ui/Button";
+import { useWorkspace } from "../../context/WorkspaceContext";
+import { WorkspaceModal } from "./WorkspaceModal";
 
 const LINKS = [
   { to: "/analyze", label: "Analyze", icon: <FiUploadCloud /> },
   { to: "/cases", label: "Cases", icon: <FiFolder /> },
   { to: "/compare", label: "Cross-case", icon: <FiGitMerge /> },
+  { to: "/watchlist", label: "Watchlist", icon: <FiEye /> },
 ];
 
 export const GITHUB_URL = "https://github.com/innovatewithkishlay/ThreatLens";
 
-const GoogleIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-    <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.5 14.6 2.5 12 2.5 6.8 2.5 2.6 6.7 2.6 12s4.2 9.5 9.4 9.5c5.4 0 9-3.8 9-9.2 0-.6-.1-1.1-.2-1.6H12z" />
-  </svg>
-);
-
-const UserMenu = () => {
-  const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
-  const ref = useClickOutside<HTMLDivElement>(() => setOpen(false), open);
-  if (!user) return null;
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] py-1 pl-1 pr-2.5 transition hover:border-accent/40"
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        {user.avatar ? (
-          <img src={user.avatar} alt="" referrerPolicy="no-referrer" className="h-7 w-7 rounded-lg object-cover" />
-        ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/15 text-accent">
-            <FiUser />
-          </span>
-        )}
-        <span className="hidden max-w-[120px] truncate text-sm text-slate-200 md:block">{user.name.split(" ")[0]}</span>
-        <FiChevronDown className={clsx("text-slate-500 transition", open && "rotate-180")} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            role="menu"
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-ink-850/95 shadow-2xl backdrop-blur-xl"
-          >
-            <div className="border-b border-white/[0.06] px-4 py-3">
-              <p className="truncate text-sm font-medium text-white">{user.name}</p>
-              <p className="truncate text-xs text-slate-500">{user.email}</p>
-            </div>
-            <NavLink to="/cases" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/[0.05]">
-              <FiFolder /> My cases
-            </NavLink>
-            <button
-              onClick={() => {
-                setOpen(false);
-                logout();
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sev-critical hover:bg-sev-critical/10"
-            >
-              <FiLogOut /> Sign out
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
 export const Navbar = () => {
-  const { user, loading, googleEnabled, signIn } = useAuth();
+  const { workspace } = useWorkspace();
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => setMobileOpen(false), [location.pathname]);
   useEffect(() => {
@@ -119,6 +71,15 @@ export const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-sm text-slate-500 transition hover:border-accent/40 hover:text-slate-300 lg:w-56"
+            aria-label="Search"
+          >
+            <FiSearch />
+            <span className="hidden flex-1 text-left lg:inline">Search entities…</span>
+            <kbd className="hidden rounded border border-white/10 px-1.5 font-mono text-[10px] lg:inline">⌘K</kbd>
+          </button>
           <a
             href={GITHUB_URL}
             target="_blank"
@@ -128,26 +89,19 @@ export const Navbar = () => {
           >
             <FiGithub className="text-lg" />
           </a>
-          <NavLink to="/contribute" className={({ isActive }) => clsx(navCls({ isActive }), "hidden lg:flex")}>
+          <NavLink to="/contribute" className={({ isActive }) => clsx(navCls({ isActive }), "hidden xl:flex")}>
             <FiGitPullRequest />
             Contribute
           </NavLink>
-          {!loading &&
-            (user ? (
-              <UserMenu />
-            ) : googleEnabled ? (
-              <Button variant="secondary" size="sm" onClick={signIn} icon={<GoogleIcon />} className="py-2">
-                Sign in
-              </Button>
-            ) : (
-              <span
-                className="hidden items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-slate-400 sm:flex"
-                title="Your cases are private to this browser."
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                Guest workspace
-              </span>
-            ))}
+          <button
+            onClick={() => setWorkspaceOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-accent/40 hover:text-white"
+            title="Workspace key, sharing and switching"
+          >
+            <FiKey />
+            <span className="hidden sm:inline">Workspace</span>
+            {workspace && <span className="hidden font-mono text-slate-600 md:inline">{workspace.key.slice(0, 4)}</span>}
+          </button>
           <button className="rounded-lg p-2 text-slate-300 hover:bg-white/[0.06] md:hidden" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
             {mobileOpen ? <FiX className="text-xl" /> : <FiMenu className="text-xl" />}
           </button>
@@ -173,6 +127,8 @@ export const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <WorkspaceModal open={workspaceOpen} onClose={() => setWorkspaceOpen(false)} />
     </header>
   );
 };

@@ -41,7 +41,7 @@ export const CookieBanner = () => {
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <p className="flex-1 text-sm text-slate-300">
-              🍪 ThreatLens only uses <strong className="text-white">essential cookies</strong> to keep you signed in and your cases private. No tracking or
+              🍪 ThreatLens only uses <strong className="text-white">essential cookies</strong> to keep your workspace private. No tracking or
               advertising.{" "}
               <Link to="/cookie-policy" className="text-accent hover:underline" onClick={dismiss}>
                 Learn more

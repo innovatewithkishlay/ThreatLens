@@ -16,6 +16,11 @@ const rand = () => {
 };
 const pick = (arr) => arr[Math.floor(rand() * arr.length)];
 const between = (min, max) => Math.round(min + rand() * (max - min));
+// Log-normal amounts look like real payments (and follow Benford's law).
+const naturalAmount = (median = 900, spread = 1.1, max = 8500) => {
+  const z = Math.sqrt(-2 * Math.log(Math.max(rand(), 1e-9))) * Math.cos(2 * Math.PI * rand());
+  return Math.min(max, Math.max(20, Math.round(median * Math.exp(spread * z) * 100) / 100));
+};
 
 const FIRST = ["Olivia", "Liam", "Amara", "Noah", "Priya", "Lucas", "Sofia", "Mateo", "Hana", "Ethan", "Zara", "Leo", "Maya", "Omar", "Elena", "Kenji", "Aisha", "Daniel", "Ines", "Victor"];
 const LAST = ["Carter", "Okafor", "Silva", "Novak", "Sharma", "Muller", "Rossi", "Tanaka", "Haddad", "Brooks", "Ivanova", "Kim", "Moreau", "Mensah", "Larsen"];
@@ -82,11 +87,11 @@ const accountsA = Object.keys(A).filter((a) => a.startsWith("ACC10"));
 const rowsA = [];
 
 // Ordinary business activity
-for (let i = 0; i < 90; i++) {
+for (let i = 0; i < 120; i++) {
   const from = pick(accountsA);
   let to = pick(accountsA);
   while (to === from) to = pick(accountsA);
-  rowsA.push({ date: ts(between(1, 14), between(8, 18), between(0, 59)), from, to, amount: between(150, 4200) + between(0, 99) / 100 });
+  rowsA.push({ date: ts(between(1, 14), between(8, 18), between(0, 59)), from, to, amount: naturalAmount() });
 }
 
 // Structuring just below 10,000
@@ -140,6 +145,12 @@ for (let i = 0; i < 7; i++) rowsA.push({ date: ts(1 + i * 2, 17, 5), from: "ACC1
 A.ACC1016.opened = "2025-06-05";
 rowsA.push({ date: ts(8, 11, 20), from: "ACC1016", to: "ACC1009", amount: 25000, desc: "Transfer" });
 
+// Dormant account reactivated: quiet since April, then a large burst
+A.ACC1021 = { holder: "Marta Kowalski", type: "personal", opened: "2016-03-14", email: "m.kowalski@mail.example", mobile: "+44 7311 482019", ip: "81.2.69.160", country: "GB" };
+rowsA.push({ id: "TX-A-DORM1", date: "2025-04-11T10:12:00", from: "ACC1021", to: "UTILCO-01", amount: 140, desc: "Utilities" });
+rowsA.push({ id: "TX-A-DORM2", date: "2025-06-12T09:03:00", from: "ACC1002", to: "ACC1021", amount: 26000, desc: "Loan" });
+rowsA.push({ id: "TX-A-DORM3", date: "2025-06-12T16:40:00", from: "ACC1021", to: "ACC1009", amount: 25200, desc: "Transfer" });
+
 // Shared identifiers
 A.ACC1011.email = A.ACC1010.email;
 A.ACC1013.mobile = A.ACC1010.mobile;
@@ -161,7 +172,7 @@ for (let i = 0; i < 60; i++) {
   const from = pick(accountsB);
   let to = pick(accountsB);
   while (to === from) to = pick(accountsB);
-  rowsB.push({ date: ts(between(8, 20), between(8, 18), between(0, 59)), from, to, amount: between(200, 3800) + between(0, 99) / 100 });
+  rowsB.push({ date: ts(between(8, 20), between(8, 18), between(0, 59)), from, to, amount: naturalAmount() });
 }
 
 // Funds collected in case A leave via the same mule accounts

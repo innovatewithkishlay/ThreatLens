@@ -12,7 +12,6 @@ export default defineConfig(({ mode }) => {
       // requests same-origin so auth cookies just work.
       proxy: {
         "/api": { target, changeOrigin: false },
-        "/auth": { target, changeOrigin: false },
       },
     },
     build: {

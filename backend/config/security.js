@@ -10,7 +10,7 @@ const helmetMiddleware = helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-      imgSrc: ["'self'", "data:", "blob:", "https://*.googleusercontent.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'"],
       frameAncestors: ["'none'"],
     },

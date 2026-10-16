@@ -87,11 +87,18 @@
 }
 
 @media print {
+  @page {
+    margin: 16mm;
+  }
   body {
     background: #fff !important;
     color: #000 !important;
   }
   .no-print {
     display: none !important;
+  }
+  main > div {
+    padding: 0 !important;
+    max-width: none !important;
   }
 }

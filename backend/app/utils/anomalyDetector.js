@@ -1,4 +1,5 @@
 const DEFAULT_THRESHOLDS = require("../../config/thresholds");
+const { screenAccounts } = require("./screening");
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
@@ -20,6 +21,41 @@ const FINDING_TYPES = {
   newAccount: { label: "New account, large value", category: "Behaviour" },
   highRiskGeo: { label: "High-risk jurisdiction", category: "Geography" },
   sharedIdentity: { label: "Shared identifiers", category: "Identity" },
+  watchlist: { label: "Watchlist match", category: "Screening" },
+  dormant: { label: "Dormant account reactivated", category: "Behaviour" },
+  outlier: { label: "Out-of-pattern transfer", category: "Behaviour" },
+  benford: { label: "Benford's law deviation", category: "Forensic" },
+};
+
+const BENFORD_EXPECTED = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => Math.log10(1 + 1 / d));
+const firstDigit = (n) => {
+  const s = String(Math.abs(n)).replace(/^[0.]+/, "");
+  const d = Number(s[0]);
+  return d >= 1 && d <= 9 ? d : null;
+};
+
+/**
+ * First-digit Benford test with Nigrini's mean absolute deviation (MAD)
+ * conformity ranges. Naturally occurring financial amounts follow Benford's
+ * law; fabricated or manipulated amounts usually do not.
+ */
+const benfordTest = (amounts, minCount) => {
+  const eligible = amounts.filter((a) => a >= 10);
+  const counts = Array(9).fill(0);
+  eligible.forEach((a) => {
+    const d = firstDigit(a);
+    if (d) counts[d - 1]++;
+  });
+  const n = counts.reduce((s, c) => s + c, 0);
+  const digits = counts.map((count, i) => ({
+    digit: i + 1,
+    count,
+    observed: n ? count / n : 0,
+    expected: BENFORD_EXPECTED[i],
+  }));
+  const mad = n ? digits.reduce((s, d) => s + Math.abs(d.observed - d.expected), 0) / 9 : 0;
+  const conformity = mad < 0.006 ? "close" : mad < 0.012 ? "acceptable" : mad < 0.015 ? "marginal" : "nonconformity";
+  return { n, digits, mad: Math.round(mad * 10000) / 10000, conformity, applicable: n >= minCount };
 };
 
 const levelFromScore = (score) => {
@@ -77,7 +113,7 @@ const findCycles = (adjacency, { maxLength, maxCycles, maxSteps = 200000 }) => {
  * @param {Array} input.accounts - { accountNumber, accountHolder, openedAt, country, metadata }
  * @param {object} [thresholds]
  */
-const analyzeCase = ({ transactions, accounts = [] }, thresholds = DEFAULT_THRESHOLDS) => {
+const analyzeCase = ({ transactions, accounts = [], watchlist = [] }, thresholds = DEFAULT_THRESHOLDS) => {
   const T = { ...DEFAULT_THRESHOLDS, ...thresholds };
   const highRisk = new Set(T.HIGH_RISK_COUNTRIES);
   const findings = [];
@@ -459,6 +495,114 @@ const analyzeCase = ({ transactions, accounts = [] }, thresholds = DEFAULT_THRES
     }
   }
 
+  // 13. Watchlist screening
+  const hitsByAccount = new Map();
+  for (const hit of screenAccounts(accounts, watchlist)) {
+    if (!hitsByAccount.has(hit.account)) hitsByAccount.set(hit.account, []);
+    hitsByAccount.get(hit.account).push(hit);
+  }
+  for (const [account, hits] of hitsByAccount) {
+    const best = hits.sort((x, y) => y.score - x.score)[0];
+    const fieldLabel = { account: "account number", email: "email", mobile: "phone", ipAddress: "IP address", accountHolder: "name" }[best.field];
+    addFinding({
+      type: "watchlist",
+      severity: "critical",
+      title: `${account} matches watchlist entry "${best.entry.value}"`,
+      description:
+        `The account's ${fieldLabel} (${best.value}) ${best.score < 1 ? `closely resembles (${Math.round(best.score * 100)}% similarity)` : "exactly matches"} a watchlist entry` +
+        `${best.entry.note ? ` - ${best.entry.note}` : ""}.`,
+      accounts: [account],
+      transactions: transactions.filter((t) => t.fromAccount === account || t.toAccount === account).map(idOf),
+      meta: { matches: hits.map((h) => ({ field: h.field, value: h.value, entry: h.entry.value, type: h.entry.type, score: h.score })) },
+    });
+  }
+
+  // 14. Dormant account reactivation
+  const activityByAccount = new Map();
+  for (const t of transactions) {
+    if (time(t) === null) continue;
+    for (const acc of [t.fromAccount, t.toAccount]) {
+      if (!activityByAccount.has(acc)) activityByAccount.set(acc, []);
+      activityByAccount.get(acc).push(t);
+    }
+  }
+  for (const [account, txs] of activityByAccount) {
+    const sorted = txs.sort((a, b) => time(a) - time(b));
+    for (let i = 1; i < sorted.length; i++) {
+      const gapDays = (time(sorted[i]) - time(sorted[i - 1])) / DAY;
+      if (gapDays < T.DORMANT.days) continue;
+      const start = time(sorted[i]);
+      const burst = sorted.slice(i).filter((t) => time(t) - start <= T.DORMANT.windowDays * DAY);
+      const moved = sum(burst, (t) => t.amount);
+      const before = sorted.slice(0, i);
+      const usual = sum(before, (t) => t.amount) / before.length;
+      if (moved >= T.DORMANT.minAmount && moved >= usual * 3) {
+        addFinding({
+          type: "dormant",
+          severity: "high",
+          title: `${account} reactivated after ${Math.round(gapDays)} days and moved ${fmt(moved)}`,
+          description: `The account was inactive for ${Math.round(gapDays)} days, then handled ${burst.length} transfer${burst.length > 1 ? "s" : ""} worth ${fmt(moved)} within ${T.DORMANT.windowDays} days - ${Math.round(moved / Math.max(usual, 1))}× its previous average. Dormant accounts are often taken over or sold to launder funds.`,
+          subjects: [account],
+          accounts: [account, ...burst.map((t) => (t.fromAccount === account ? t.toAccount : t.fromAccount))],
+          transactions: burst.map(idOf),
+          amount: moved,
+          meta: { gapDays: Math.round(gapDays) },
+        });
+        break;
+      }
+    }
+  }
+
+  // 15. Out-of-pattern transfers relative to the sender's own history
+  for (const [account, txs] of bySender) {
+    if (txs.length < T.OUTLIER.minHistory) continue;
+    const amounts = txs.map((t) => t.amount).sort((a, b) => a - b);
+    const median = amounts[Math.floor(amounts.length / 2)];
+    const outliers = txs.filter((t) => t.amount < T.HIGH_VALUE && t.amount >= T.OUTLIER.minAmount && t.amount >= median * T.OUTLIER.multiple);
+    if (outliers.length && outliers.length <= Math.max(2, txs.length * 0.2)) {
+      const top = Math.max(...outliers.map((t) => t.amount));
+      addFinding({
+        type: "outlier",
+        severity: top >= median * T.OUTLIER.multiple * 5 ? "high" : "medium",
+        title: `${account} sent ${fmt(top)} - ${Math.round(top / median)}× its typical transfer`,
+        description: `This account usually sends around ${fmt(median)} (median of ${txs.length} transfers). ${outliers.length === 1 ? "One transfer is" : `${outliers.length} transfers are`} at least ${T.OUTLIER.multiple}× larger, which breaks its established behaviour.`,
+        subjects: [account],
+        accounts: [account, ...outliers.map((t) => t.toAccount)],
+        transactions: outliers.map(idOf),
+        meta: { median, multiple: Math.round(top / median) },
+      });
+    }
+  }
+
+  // 16. Benford's law (dataset-wide forensic test)
+  const benford = benfordTest(transactions.map((t) => t.amount), T.BENFORD.minCount);
+  if (benford.applicable && benford.conformity === "nonconformity") {
+    const spikes = benford.digits
+      .filter((d) => d.observed - d.expected > 0.02)
+      .sort((a, b) => b.observed - b.expected - (a.observed - a.expected))
+      .slice(0, 2)
+      .map((d) => d.digit);
+    // Accounts that concentrate their transfers on the over-represented digits.
+    const contributors = [...bySender.entries()]
+      .map(([account, txs]) => {
+        const hit = txs.filter((t) => spikes.includes(firstDigit(t.amount)));
+        return { account, hit, share: hit.length / txs.length };
+      })
+      .filter((c) => c.hit.length >= 3 && c.share >= 0.6)
+      .sort((a, b) => b.hit.length - a.hit.length)
+      .slice(0, 10);
+    addFinding({
+      type: "benford",
+      severity: benford.mad >= 0.03 ? "high" : "medium",
+      title: `Amounts deviate from Benford's law (MAD ${benford.mad.toFixed(4)})`,
+      description: `In natural financial data about 30% of amounts start with 1. Here ${spikes.length ? `leading digit${spikes.length > 1 ? "s" : ""} ${spikes.join(" and ")} ${spikes.length > 1 ? "are" : "is"} over-represented` : "the first-digit distribution is unusual"}, which can indicate fabricated, manipulated or threshold-driven amounts.${contributors.length ? " The listed accounts concentrate on those digits." : ""}`,
+      subjects: contributors.map((c) => c.account),
+      accounts: contributors.map((c) => c.account),
+      transactions: contributors.flatMap((c) => c.hit).map(idOf),
+      meta: { mad: benford.mad, spikes },
+    });
+  }
+
   // ---- Account profiles & risk -------------------------------------------
   const allAccountNumbers = new Set([...accountMap.keys(), ...bySender.keys(), ...byReceiver.keys()]);
   const accountRisk = [...allAccountNumbers].map((number) => {
@@ -575,6 +719,7 @@ const analyzeCase = ({ transactions, accounts = [] }, thresholds = DEFAULT_THRES
       daily: [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
     },
     geography: [...countryMap.values()].sort((a, b) => b.volume - a.volume),
+    benford,
     flaggedTransactions,
     thresholds: {
       highValue: T.HIGH_VALUE,
@@ -584,4 +729,4 @@ const analyzeCase = ({ transactions, accounts = [] }, thresholds = DEFAULT_THRES
   };
 };
 
-module.exports = { analyzeCase, findCycles, levelFromScore, FINDING_TYPES };
+module.exports = { analyzeCase, findCycles, levelFromScore, benfordTest, FINDING_TYPES };

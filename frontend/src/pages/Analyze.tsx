@@ -14,7 +14,7 @@ import { api, type ApiError } from "../lib/api";
 import { SAMPLE_A, useDemoCase } from "../hooks/useDemoCase";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
-const STAGES = ["Uploading file", "Parsing & validating rows", "Running 13 detectors", "Scoring accounts & building network"];
+const STAGES = ["Uploading file", "Parsing & validating rows", "Running 17 detectors", "Scoring accounts & building network"];
 
 const Analyze = () => {
   useDocumentTitle("Analyze");

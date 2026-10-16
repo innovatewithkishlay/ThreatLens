@@ -13,14 +13,14 @@ const PrivacyPolicy = () => {
       </p>
       <h2>What we collect</h2>
       <ul>
-        <li><strong>Account details</strong> - if you sign in with Google: your name, email address and profile picture.</li>
+        <li><strong>No personal account data</strong> - ThreatLens has no sign-up or login. We never ask for your name or email.</li>
         <li><strong>Case data</strong> - the transaction files you upload, stored as structured records so you can revisit your investigations.</li>
-        <li><strong>Essential cookies</strong> - a session token and an anonymous workspace identifier. See the <Link to="/cookie-policy">cookie policy</Link>.</li>
+        <li><strong>One essential cookie</strong> - an anonymous, random workspace key. See the <Link to="/cookie-policy">cookie policy</Link>.</li>
       </ul>
       <h2>How we use it</h2>
       <ul>
         <li>To run the analysis you request and display the results.</li>
-        <li>To keep your cases private to you (or to your browser, if you are not signed in).</li>
+        <li>To keep your cases private to your workspace. Only people you share the workspace key with can open it.</li>
         <li>To protect the service against abuse, e.g. through rate limiting.</li>
       </ul>
       <h2>Uploaded files</h2>
@@ -32,7 +32,7 @@ const PrivacyPolicy = () => {
       <ul>
         <li>Access the data we hold about you - every case can be exported as CSV or JSON.</li>
         <li>Delete any case at any time from the case workspace.</li>
-        <li>Request deletion of your account by contacting us.</li>
+        <li>Start a fresh workspace at any time; delete cases and watchlist entries individually.</li>
       </ul>
       <h2>Self-hosting</h2>
       <p>If you run your own instance of ThreatLens, you are the data controller for that instance and this policy serves only as a template.</p>

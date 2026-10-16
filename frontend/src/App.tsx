@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { AuthProvider } from "./context/AuthContext";
+import { WorkspaceProvider } from "./context/WorkspaceContext";
 import { AppShell } from "./components/layout/AppShell";
 import { CookieBanner } from "./components/layout/CookieBanner";
 import { PageLoader } from "./components/ui/Spinner";
@@ -10,12 +10,15 @@ import Home from "./pages/Home";
 const Analyze = lazy(() => import("./pages/Analyze"));
 const Cases = lazy(() => import("./pages/Cases"));
 const CaseView = lazy(() => import("./pages/CaseView"));
+const CaseReport = lazy(() => import("./pages/CaseReport"));
+const Watchlist = lazy(() => import("./pages/Watchlist"));
 const Compare = lazy(() => import("./pages/Compare"));
 const CompareResults = lazy(() => import("./pages/CompareResults"));
 const Contribute = lazy(() => import("./pages/Contribute"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const JoinWorkspace = lazy(() => import("./pages/JoinWorkspace"));
 
 const LegacyResults = () => {
   const { caseId } = useParams();
@@ -27,7 +30,7 @@ const LegacyCompare = () => {
 };
 
 export const App = () => (
-  <AuthProvider>
+  <WorkspaceProvider>
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -36,6 +39,9 @@ export const App = () => (
             <Route path="analyze" element={<Analyze />} />
             <Route path="cases" element={<Cases />} />
             <Route path="cases/:id" element={<CaseView />} />
+            <Route path="cases/:id/report" element={<CaseReport />} />
+            <Route path="watchlist" element={<Watchlist />} />
+            <Route path="join/:key" element={<JoinWorkspace />} />
             <Route path="compare" element={<Compare />} />
             <Route path="compare/:a/:b" element={<CompareResults />} />
             <Route path="contribute" element={<Contribute />} />
@@ -68,5 +74,5 @@ export const App = () => (
         }}
       />
     </BrowserRouter>
-  </AuthProvider>
+  </WorkspaceProvider>
 );

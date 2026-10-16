@@ -121,3 +121,29 @@ exports.exportCase = async (req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${base}-transactions.csv"`);
   res.send(lines.join("\n"));
 };
+
+exports.reanalyze = async (req, res) => {
+  res.json(await service.reanalyzeCase(req.params.id, req.owner, { thresholds: req.body?.thresholds }));
+};
+
+exports.trace = async (req, res) => {
+  res.json(
+    await service.traceCase(req.params.id, req.owner, {
+      account: req.query.account,
+      direction: req.query.direction,
+      hops: req.query.hops,
+    })
+  );
+};
+
+exports.report = async (req, res) => {
+  res.json(await service.reportForCase(req.params.id, req.owner));
+};
+
+exports.links = async (req, res) => {
+  res.json(await service.crossCaseLinks(req.params.id, req.owner));
+};
+
+exports.search = async (req, res) => {
+  res.json(await service.searchEntities(req.owner, req.query.q));
+};
