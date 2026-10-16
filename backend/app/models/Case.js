@@ -3,75 +3,39 @@ const mongoose = require("mongoose");
 const caseSchema = new mongoose.Schema(
   {
     caseId: { type: String, required: true, unique: true },
-    description: String,
-    accounts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Account" }],
-    transactions: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
-    ],
-    linkedCases: [{ type: mongoose.Schema.Types.ObjectId, ref: "Case" }],
-    anomalies: {
-      highValue: [
-        {
-          transaction: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Transaction",
-          },
-          amount: Number,
-          date: Date,
-        },
-      ],
-      structuring: [
-        {
-          account: String,
-          count: Number,
-          totalAmount: Number,
-        },
-      ],
-      circular: [
-        {
-          path: [String],
-          totalAmount: Number,
-          transactions: [
-            { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
-          ],
-        },
-      ],
-      geographic: [
-        {
-          account: String,
-          country: String,
-          transactionCount: Number,
-        },
-      ],
-      network: {
-        nodes: {
-          type: [
-            {
-              account: String,
-              riskScore: Number,
-            },
-          ],
-          default: [],
-        },
-        edges: {
-          type: [
-            {
-              from: String,
-              to: String,
-              totalAmount: Number,
-            },
-          ],
-          default: [],
-        },
-      },
+    name: { type: String, trim: true, maxlength: 120 },
+    description: { type: String, maxlength: 2000 },
+    owner: {
+      kind: { type: String, enum: ["user", "guest"], required: true },
+      id: { type: String, required: true },
     },
-    metadataPatterns: {
-      commonEmails: [String],
-      commonPhones: [String],
-      commonIPs: [String],
+    sourceFile: String,
+    status: {
+      type: String,
+      enum: ["open", "investigating", "escalated", "closed"],
+      default: "open",
     },
+    notes: { type: String, maxlength: 10000, default: "" },
+    stats: {
+      transactionCount: Number,
+      accountCount: Number,
+      totalVolume: Number,
+      averageAmount: Number,
+      maxAmount: Number,
+      currency: String,
+      dateRange: { start: Date, end: Date },
+      skippedRows: Number,
+      flaggedTransactions: Number,
+    },
+    riskScore: { type: Number, default: 0 },
+    riskLevel: { type: String, default: "low" },
+    // Full detection output (findings, network, account risk, summary).
+    analysis: { type: mongoose.Schema.Types.Mixed, default: {} },
+    warnings: [String],
   },
-  { timestamps: true }
+  { timestamps: true, minimize: false }
 );
+
+caseSchema.index({ "owner.kind": 1, "owner.id": 1, createdAt: -1 });
 
 module.exports = mongoose.model("Case", caseSchema);

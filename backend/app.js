@@ -1,68 +1,71 @@
-require("dotenv").config();
+const path = require("path");
+const fs = require("fs");
 const express = require("express");
-const { helmet, limiter, cors, corsOptions } = require("./config/security");
-const connectDB = require("./config/db");
-const caseRoutes = require("./app/routes/caseRoutes");
-const transactionRoutes = require("./app/routes/transactionRoutes");
-const authRoutes = require("./app/routes/auth");
-const passport = require("passport");
-const session = require("express-session");
 const cookieParser = require("cookie-parser");
+const mongoose = require("mongoose");
+const env = require("./config/env");
+const { helmetMiddleware, corsMiddleware, apiLimiter } = require("./config/security");
+const passport = require("./config/passport");
+const connectDB = require("./config/db");
+const { identify } = require("./app/middlewares/identify");
+const { notFound, errorHandler } = require("./app/middlewares/errorHandler");
+const caseRoutes = require("./app/routes/caseRoutes");
+const authRoutes = require("./app/routes/auth");
 
-const app = express();
+const createApp = () => {
+  const app = express();
+  app.disable("x-powered-by");
+  app.set("trust proxy", 1);
 
-// Security Middlewares
-app.use(helmet());
-app.use(
-  cors({
-    ...corsOptions,
-    credentials: true,
-  })
-);
-app.use(limiter);
-app.use(express.json());
-app.use(cookieParser());
+  app.use(helmetMiddleware);
+  app.use(corsMiddleware);
+  app.use(express.json({ limit: "1mb" }));
+  app.use(cookieParser(env.cookieSecret));
+  app.use(passport.initialize());
+  app.use(identify);
 
-//Session Configuration
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, //i need to updated this later
-    },
-  })
-);
-
-// Passport & Authentication
-require("./config/passport");
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Database Connection
-connectDB();
-
-// Routes
-app.use("/api/cases", caseRoutes);
-app.use("/api/transactions", transactionRoutes);
-app.use("/auth", authRoutes);
-
-// Health Check
-app.get("/", (req, res) => {
-  res.json({ status: "API Operational", timestamp: new Date() });
-});
-
-// Error Handling
-app.use((err, req, res, next) => {
-  console.error(" Error:", err.stack);
-  res.status(err.status || 500).json({
-    error:
-      process.env.NODE_ENV === "development" ? err.message : "Server Error",
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "ok",
+      database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      timestamp: new Date().toISOString(),
+    });
   });
-});
 
-const PORT = process.env.PORT || 5002;
-app.listen(PORT, () => console.log(`Secure server running on port ${PORT}`));
+  app.use("/api", apiLimiter);
+  app.use("/api/cases", caseRoutes);
+  app.use("/auth", authRoutes);
+  app.use(["/api", "/auth"], notFound);
+
+  // Serve the built frontend when it exists (single-service deployment).
+  const dist = path.resolve(__dirname, "../frontend/dist");
+  if (fs.existsSync(path.join(dist, "index.html"))) {
+    app.use(express.static(dist, { maxAge: "1h", index: false }));
+    app.get(/^\/(?!api|auth).*/, (req, res) => res.sendFile(path.join(dist, "index.html")));
+  } else {
+    app.get("/", (req, res) => res.json({ status: "ThreatLens API operational" }));
+  }
+
+  app.use(errorHandler);
+  return app;
+};
+
+const start = async () => {
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error(`[threatlens] Could not connect to MongoDB at ${env.dbUri}`);
+    console.error(`[threatlens] ${err.message}`);
+    console.error("[threatlens] Start MongoDB or set DB_URI in backend/.env and try again.");
+    process.exit(1);
+  }
+  const app = createApp();
+  app.listen(env.port, () => {
+    console.log(`[threatlens] API listening on http://localhost:${env.port}`);
+    console.log(`[threatlens] Google sign-in ${env.googleEnabled ? "enabled" : "disabled (guest mode only)"}`);
+  });
+};
+
+if (require.main === module) start();
+
+module.exports = { createApp, start };

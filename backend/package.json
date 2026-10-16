@@ -1,32 +1,34 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "threatlens-backend",
+  "version": "2.0.0",
+  "description": "ThreatLens API - AML transaction analysis and cross-case investigation",
+  "main": "app.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "test": "node --test test/*.test.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
-    "express-session": "^1.18.1",
     "helmet": "^8.1.0",
-    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.17.0",
     "mongoose": "^8.15.1",
     "multer": "^2.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.1"
   }
 }
