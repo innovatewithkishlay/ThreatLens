@@ -43,6 +43,7 @@ const dateRange = (txs) => {
 };
 
 const DAY = 24 * 3600 * 1000;
+const FLOW_WINDOW_MS = 7 * DAY;
 
 /**
  * Compare two analysed cases and surface links between them.
@@ -98,6 +99,10 @@ const compareCases = (a, b, thresholds = DEFAULT_THRESHOLDS) => {
     const ib = identifiers(b, field);
     for (const [value, accsA] of ia) {
       if (ib.has(value)) {
+        // The same account appearing in both cases is already a shared
+        // account; only report identifiers that tie *different* accounts.
+        const accsB = ib.get(value);
+        if ([...accsA].every((x) => accsB.has(x)) && [...accsB].every((x) => accsA.has(x))) continue;
         sharedIdentifiers.push({ field, label, value, accountsA: [...accsA], accountsB: [...ib.get(value)] });
       }
     }
@@ -117,7 +122,11 @@ const compareCases = (a, b, thresholds = DEFAULT_THRESHOLDS) => {
       if (!onward) continue;
       for (const t2 of onward) {
         if (crossCaseFlows.length >= 200) return;
+        if (t2.toAccount === t1.fromAccount) continue;
         const gapMs = t1.date && t2.date ? new Date(t2.date) - new Date(t1.date) : null;
+        // Money can only move on after it arrives, and only flows within
+        // the window are meaningful.
+        if (gapMs !== null && (gapMs < 0 || gapMs > FLOW_WINDOW_MS)) continue;
         crossCaseFlows.push({
           direction,
           path: [t1.fromAccount, t1.toAccount, t2.toAccount],
@@ -222,7 +231,7 @@ const compareCases = (a, b, thresholds = DEFAULT_THRESHOLDS) => {
   const factors = [
     { key: "sharedAccounts", label: "Shared accounts", value: sharedAccounts.length, points: Math.min(40, sharedAccounts.length * 15) },
     { key: "sharedIdentifiers", label: "Shared identifiers", value: sharedIdentifiers.length, points: Math.min(30, sharedIdentifiers.length * 12) },
-    { key: "crossCaseFlows", label: "Cross-case money flows", value: crossCaseFlows.length, points: Math.min(25, crossCaseFlows.length * 5) },
+    { key: "crossCaseFlows", label: "Cross-case money flows (≤7 days)", value: crossCaseFlows.length, points: Math.min(20, crossCaseFlows.length * 2) },
     { key: "patternSimilarity", label: "Typology similarity", value: similarity.typologies, points: Math.round(similarity.typologies * 15) },
     { key: "highRiskGeo", label: "Common high-risk jurisdictions", value: geography.commonHighRisk.length, points: Math.min(15, geography.commonHighRisk.length * 8) },
     { key: "temporalOverlap", label: "Overlapping activity period", value: overlap ? overlap.days : 0, points: overlap ? 5 : 0 },

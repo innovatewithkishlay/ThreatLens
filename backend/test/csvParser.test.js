@@ -37,7 +37,7 @@ test("parses flexible headers and skips invalid rows", async () => {
 });
 
 test("supports semicolon separated files with BOM", async () => {
-  const csv = "﻿fromAccount;toAccount;amount\nX;Y;10\n";
+  const csv = "\uFEFFfromAccount;toAccount;amount\nX;Y;10\n";
   const result = await parseTransactionsCsv(Buffer.from(csv));
   assert.equal(result.transactions.length, 1);
 });

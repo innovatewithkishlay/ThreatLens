@@ -26,7 +26,7 @@ const REQUIRED_FIELDS = ["fromAccount", "toAccount", "amount"];
 
 const normaliseHeader = (h) =>
   String(h || "")
-    .replace(/^﻿/, "")
+    .replace(/^\uFEFF/, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
@@ -128,7 +128,7 @@ const readRows = (buffer, separator) =>
       .pipe(
         csv({
           separator,
-          mapHeaders: ({ header }) => header.replace(/^﻿/, "").trim(),
+          mapHeaders: ({ header }) => header.replace(/^\uFEFF/, "").trim(),
           skipLines: 0,
           strict: false,
         })

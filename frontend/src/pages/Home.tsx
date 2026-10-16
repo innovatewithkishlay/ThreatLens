@@ -1,485 +1,217 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { GlowingButton } from "../components/UI/GlowingButton";
-import { useAuth } from "../contexts/AuthContext";
-import { toast } from "react-hot-toast";
+import { motion, type Variants } from "framer-motion";
 import {
   FiActivity,
-  FiMapPin,
-  FiShield,
-  FiUsers,
-  FiDatabase,
-  FiTrendingUp,
-  FiEye,
-  FiCheck,
+  FiArrowRight,
   FiClock,
-  FiBarChart,
+  FiCpu,
+  FiDownload,
+  FiGitMerge,
+  FiGlobe,
+  FiLock,
+  FiPlay,
+  FiRepeat,
+  FiShare2,
+  FiShield,
+  FiUploadCloud,
+  FiUsers,
+  FiZap,
 } from "react-icons/fi";
-import { Navbar } from "../components/UI/Navbar";
-import Footer from "../components/UI/Footer";
-import ContributePopup from "../components/UI/ContributePopup";
-import SignInRequiredModal from "../components/UI/SignInRequiredModal";
-import SignInReminderModal from "../components/UI/SignInReminderModal";
+import { HeroGraph } from "../components/viz/HeroGraph";
+import { Button, LinkButton } from "../components/ui/Button";
+import { useDemoCase } from "../hooks/useDemoCase";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { GITHUB_URL } from "../components/layout/Navbar";
 
-export const Home = () => {
-  const navigate = useNavigate();
-  const { user, loading } = useAuth();
-  const [showProPopup, setShowProPopup] = useState(false);
-  const [showContributePopup, setShowContributePopup] = useState(false);
-  const [showSignInModal, setShowSignInModal] = useState(false);
-  const [showReminderModal, setShowReminderModal] = useState(false);
-  const reminderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 24 },
+  show: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.6, ease: [0.22, 1, 0.36, 1] as const } }),
+};
 
-  useEffect(() => {
-    if (user && localStorage.getItem("showWelcomeToast") === "true") {
-      toast.success(`Welcome back, ${user.name}`, {
-        icon: "👋",
-        style: {
-          background: "#0d0d0d",
-          color: "#00ff9d",
-          border: "1px solid #00ff9d50",
-        },
-      });
-      localStorage.removeItem("showWelcomeToast");
-    }
-  }, [user]);
+const TYPOLOGIES = [
+  { icon: <FiRepeat />, title: "Circular flows", text: "Chronological loops where money returns to its origin through intermediaries." },
+  { icon: <FiZap />, title: "Structuring", text: "Repeated transfers just under the reporting threshold." },
+  { icon: <FiShare2 />, title: "Fan-in / fan-out", text: "Smurfing deposits and rapid dispersion across many accounts." },
+  { icon: <FiActivity />, title: "Pass-through mules", text: "Funds received and forwarded within minutes." },
+  { icon: <FiUsers />, title: "Shared identities", text: "Distinct accounts sharing an email, phone or IP address." },
+  { icon: <FiGlobe />, title: "High-risk jurisdictions", text: "Exposure to FATF-monitored countries, mapped worldwide." },
+  { icon: <FiClock />, title: "Behavioural anomalies", text: "Bursts, off-hours activity and repeated counterparties." },
+  { icon: <FiShield />, title: "New-account abuse", text: "Large transfers soon after an account is opened." },
+];
 
-  // Show the Contribute popup 5 seconds after every page load
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowContributePopup(true);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
+const STEPS = [
+  { icon: <FiUploadCloud />, title: "Upload a CSV", text: "Drop any transaction export. Column names are detected automatically - sender, beneficiary, amount, date and more." },
+  { icon: <FiCpu />, title: "13 detectors run", text: "Every transfer is scored against proven AML typologies. Accounts get explainable risk scores." },
+  { icon: <FiActivity />, title: "Investigate", text: "Explore the money network, timeline and world map. Review transactions and record case notes." },
+  { icon: <FiDownload />, title: "Report", text: "Export flagged transactions as CSV, the full analysis as JSON, or print a case report." },
+];
 
-  // Show sign-in reminder modal after 3 minutes if not signed in
-  useEffect(() => {
-    if (!user) {
-      reminderTimerRef.current = setTimeout(() => {
-        setShowReminderModal(true);
-      }, 180000); // 3 minutes
-    }
-    return () => {
-      if (reminderTimerRef.current) clearTimeout(reminderTimerRef.current);
-    };
-  }, [user]);
-
-  const handleSingleCaseClick = () => {
-    if (!user) {
-      setShowSignInModal(true);
-    } else {
-      navigate("/plugin");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#0d0d0d] flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="w-16 h-16 border-4 border-[#00ff9d] border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
+const Home = () => {
+  useDocumentTitle();
+  const demo = useDemoCase();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-[#0d0d0d] text-white overflow-hidden flex flex-col relative">
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 0,
-          pointerEvents: "none",
-          opacity: 0.18,
-          background: "transparent",
-        }}
-      >
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: "absolute", left: 0, top: 0 }}
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <pattern
-              id="smallGrid"
-              width="28"
-              height="28"
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                d="M 28 0 L 0 0 0 28"
-                fill="none"
-                stroke="#00ff9d"
-                strokeWidth="1"
-                opacity="0.18"
-              />
-            </pattern>
-            <pattern
-              id="grid"
-              width="112"
-              height="112"
-              patternUnits="userSpaceOnUse"
-            >
-              <rect width="112" height="112" fill="url(#smallGrid)" />
-              <path
-                d="M 112 0 L 0 0 0 112"
-                fill="none"
-                stroke="#00ff9d"
-                strokeWidth="1"
-                opacity="0.28"
-              />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)">
-            <animateTransform
-              attributeName="transform"
-              type="translate"
-              from="0 0"
-              to="28 28"
-              dur="20s"
-              repeatCount="indefinite"
-            />
-          </rect>
-        </svg>
-      </div>
+    <div className="overflow-hidden">
+      {/* Hero */}
+      <section className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1.1fr_1fr] lg:px-8 lg:pt-24">
+        <div>
+          <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0} className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/[0.06] px-3 py-1 text-xs font-medium text-accent">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+            </span>
+            Open-source AML investigation platform
+          </motion.div>
+          <motion.h1 variants={fadeUp} initial="hidden" animate="show" custom={1} className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            Follow the money.
+            <br />
+            <span className="text-gradient">Expose the pattern.</span>
+          </motion.h1>
+          <motion.p variants={fadeUp} initial="hidden" animate="show" custom={2} className="mt-6 max-w-xl text-lg leading-relaxed text-slate-400">
+            ThreatLens turns raw transaction exports into an investigation workspace - detecting layering, structuring, mule networks and shared identities, then
+            linking related cases together.
+          </motion.p>
+          <motion.div variants={fadeUp} initial="hidden" animate="show" custom={3} className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <LinkButton to="/analyze" size="lg" icon={<FiUploadCloud />}>
+              Analyze transactions
+            </LinkButton>
+            <Button variant="secondary" size="lg" icon={<FiPlay />} onClick={demo.runSingle} loading={demo.loading === "single"}>
+              Try the live demo
+            </Button>
+          </motion.div>
+          <motion.div variants={fadeUp} initial="hidden" animate="show" custom={4} className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
+            <span className="flex items-center gap-2"><FiLock className="text-accent" /> Cases private to you</span>
+            <span className="flex items-center gap-2"><FiZap className="text-accent" /> Results in seconds</span>
+            <span className="flex items-center gap-2"><FiShield className="text-accent" /> MIT licensed</span>
+          </motion.div>
+        </div>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.2 }}>
+          <HeroGraph />
+        </motion.div>
+      </section>
 
-      <div className="relative z-10">
-        <Navbar />
-
-        <div className="flex-1">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
-            <div className="text-center mb-16 sm:mb-20">
-              <motion.h1
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold mb-6 sm:mb-8 px-4"
-              >
-                <span className="text-[#00ff9d]">Transaction</span> Analysis
-                <br />
-                Made <span className="text-[#00ff9d]">Precise</span>
-              </motion.h1>
-
-              <motion.p
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-lg sm:text-xl lg:text-2xl text-gray-400 max-w-4xl mx-auto mb-8 sm:mb-12 leading-relaxed px-4"
-              >
-                Powerful platform for advanced data analysis, transaction
-                review, and workflow automation. Identify unusual patterns with
-                forensic precision and reduce investigation time by up to 85%.
-              </motion.p>
-
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="flex flex-col sm:flex-row gap-6 sm:gap-8 justify-center mb-12 sm:mb-16 px-4"
-              >
-                <GlowingButton
-                  variant="primary"
-                  onClick={handleSingleCaseClick}
-                >
-                  <TerminalText text="Single Case Analysis" />
-                </GlowingButton>
-
-                <div
-                  className="relative inline-block"
-                  onMouseEnter={() => setShowProPopup(true)}
-                  onMouseLeave={() => setShowProPopup(false)}
-                >
-                  <button
-                    className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-[#181a20] text-[#00ff9d] font-mono text-base sm:text-lg font-bold rounded-lg border border-[#00ff9d]/40 shadow-lg hover:bg-[#23262e] transition-all relative"
-                    style={{ paddingRight: "3.5em" }}
-                    disabled
-                  >
-                    <span className="relative flex items-center justify-center sm:justify-start">
-                      <TerminalText text="Cross-Case Investigation" />
-                      <span
-                        className="absolute -top-4 right-2 flex items-center"
-                        style={{ pointerEvents: "none" }}
-                      >
-                        <span
-                          className="bg-[#181a20]/90 border border-[#00ff9d] text-[#00ff9d] font-bold text-xs px-2 py-0.5 rounded-full shadow-md flex items-center backdrop-blur"
-                          style={{
-                            fontFamily: "monospace",
-                            fontSize: "0.95rem",
-                            transform: "translateY(-0.2em)",
-                            boxShadow: "0 2px 12px #00ff9d33",
-                            letterSpacing: "0.08em",
-                          }}
-                        >
-                          <span role="img" aria-label="pro" className="mr-1">
-                            👑
-                          </span>
-                          PRO
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                  <AnimatePresence>
-                    {showProPopup && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 30,
-                          duration: 0.2,
-                        }}
-                        className="absolute left-1/2 -translate-x-1/2 top-full mt-3 z-50 bg-[#181818]/95 border border-[#00ff9d]/30 text-white text-xs rounded-lg px-4 py-3 shadow-xl font-mono w-64 sm:w-72 text-center backdrop-blur-sm"
-                        style={{ pointerEvents: "none" }}
-                      >
-                        <div className="flex items-center gap-2 mb-1 justify-center">
-                          <motion.div
-                            className="w-2 h-2 bg-[#00ff9d] rounded-full"
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                          />
-                          <span className="font-semibold text-[#00ff9d] text-sm">
-                            Pro Feature
-                          </span>
-                        </div>
-                        <div className="text-gray-300 leading-snug mb-1 text-xs sm:text-sm">
-                          Advanced features require enterprise license.
-                          <br />
-                          Contact:{" "}
-                          <a
-                            href="mailto:kishlay141@gmail.com"
-                            className="text-[#00ff9d] underline"
-                          >
-                            kishlay141@gmail.com
-                          </a>
-                        </div>
-                        <div className="absolute left-1/2 -top-2 -translate-x-1/2 w-3 h-3 bg-[#181818]/95 border-l border-t border-[#00ff9d]/30 rotate-45"></div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20 px-4"
-              >
-                <StatCard value="99.7%" label="Pattern Detection Accuracy" />
-                <StatCard value="<2min" label="Analysis Time" />
-                <StatCard value="85%" label="Noise Reduction" />
-              </motion.div>
+      {/* Metrics strip */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="card grid grid-cols-2 divide-white/[0.06] md:grid-cols-4 md:divide-x">
+          {[
+            ["13", "Detection typologies"],
+            ["25k", "Transactions per case"],
+            ["< 5s", "Typical analysis time"],
+            ["100%", "Explainable scores"],
+          ].map(([v, l]) => (
+            <div key={l} className="px-6 py-6 text-center">
+              <div className="font-display text-3xl font-bold text-white">{v}</div>
+              <div className="mt-1 text-sm text-slate-500">{l}</div>
             </div>
+          ))}
+        </div>
+      </section>
 
+      {/* Typologies */}
+      <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="font-mono text-xs uppercase tracking-[0.2em] text-accent">Detection engine</div>
+          <h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">Built on real money-laundering typologies</h2>
+          <p className="mt-4 text-slate-400">Every finding explains what was found, why it matters and exactly which transactions are involved.</p>
+        </div>
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {TYPOLOGIES.map((t, i) => (
             <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="mb-16 sm:mb-20"
+              key={t.title}
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-60px" }}
+              custom={i % 4}
+              className="card card-hover group p-5"
             >
-              <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 px-4">
-                <span className="text-[#00ff9d]">Core</span> Features
-              </h2>
-              <p className="text-gray-400 text-center mb-8 sm:mb-12 text-base sm:text-lg max-w-3xl mx-auto px-4">
-                Comprehensive investigation tools for data-driven pattern
-                recognition and workflow automation.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-4">
-                <FeatureCard
-                  icon={<FiActivity className="text-3xl sm:text-4xl" />}
-                  title="Advanced Transaction Monitoring"
-                  description="Real-time analysis of transaction patterns to identify suspicious activities, structuring, and layering schemes across multiple accounts and jurisdictions."
-                />
-                <FeatureCard
-                  icon={<FiMapPin className="text-3xl sm:text-4xl" />}
-                  title="Geographic Risk Analysis"
-                  description="Track fund movements across geographic boundaries, identify high-risk jurisdictions, and analyze cross-border transaction flows with integrated screening."
-                />
-                <FeatureCard
-                  icon={<FiShield className="text-3xl sm:text-4xl" />}
-                  title="Behavioral Pattern Detection"
-                  description="Establishes customer activity baselines and detects deviations that may indicate potential money laundering, terrorist financing, or fraud schemes."
-                />
-                <FeatureCard
-                  icon={<FiUsers className="text-3xl sm:text-4xl" />}
-                  title="Network & Entity Analysis"
-                  description="Visualize complex relationship networks between accounts and entities to uncover hidden connections and layered ownership structures."
-                />
-                <FeatureCard
-                  icon={<FiDatabase className="text-3xl sm:text-4xl" />}
-                  title="Multi-Source Data Integration"
-                  description="Integrate transaction data, customer information, lists, and external databases for comprehensive assessment and due diligence."
-                />
-                <FeatureCard
-                  icon={<FiTrendingUp className="text-3xl sm:text-4xl" />}
-                  title="Dynamic Risk Scoring"
-                  description="Calculate dynamic risk scores based on transaction patterns, customer behavior, and external risk factors."
-                />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-lg text-accent ring-1 ring-accent/20 transition group-hover:bg-accent group-hover:text-ink-950">
+                {t.icon}
               </div>
+              <h3 className="mt-4 font-semibold text-white">{t.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{t.text}</p>
             </motion.div>
+          ))}
+        </div>
+      </section>
 
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="mb-16 sm:mb-20"
-            >
-              <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 px-4">
-                Investigation <span className="text-[#00ff9d]">Workflows</span>
-              </h2>
-              <p className="text-gray-400 text-center mb-8 sm:mb-12 text-base sm:text-lg max-w-3xl mx-auto px-4">
-                Streamlined investigation workflows with automated case
-                management and reporting.
-              </p>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 px-4">
-                <InvestigationFeature
-                  icon={<FiEye className="text-2xl sm:text-3xl" />}
-                  title="Automated Case Generation"
-                  description="Intelligent alert prioritization and case creation based on risk severity, reducing manual review time and ensuring high-risk cases receive immediate attention."
-                  features={[
-                    "Smart alert triage",
-                    "Risk-based prioritization",
-                    "Automated workflows",
-                  ]}
-                />
-                <InvestigationFeature
-                  icon={<FiBarChart className="text-2xl sm:text-3xl" />}
-                  title="Advanced Analytics Dashboard"
-                  description="Interactive visualizations and comprehensive reporting tools for investigators and compliance officers."
-                  features={[
-                    "Real-time dashboards",
-                    "Custom report generation",
-                    "Compliance tracking",
-                  ]}
-                />
-                <InvestigationFeature
-                  icon={<FiClock className="text-2xl sm:text-3xl" />}
-                  title="Rapid Investigation Tools"
-                  description="Accelerated investigation capabilities with automated data gathering, timeline reconstruction, and evidence compilation for faster case resolution."
-                  features={[
-                    "Timeline analysis",
-                    "Evidence management",
-                    "Case documentation",
-                  ]}
-                />
-                <InvestigationFeature
-                  icon={<FiCheck className="text-2xl sm:text-3xl" />}
-                  title="Compliance Automation"
-                  description="Automated reporting and audit trail maintenance ensuring consistent compliance with regulations and standards."
-                  features={[
-                    "Reporting automation",
-                    "Audit trails",
-                    "Regulatory reporting",
-                  ]}
-                />
+      {/* Workflow */}
+      <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="font-mono text-xs uppercase tracking-[0.2em] text-accent">Workflow</div>
+          <h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">From spreadsheet to findings in four steps</h2>
+        </div>
+        <div className="relative mt-12 grid gap-6 md:grid-cols-4">
+          <div className="absolute left-0 right-0 top-7 hidden h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent md:block" />
+          {STEPS.map((s, i) => (
+            <motion.div key={s.title} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i} className="relative text-center">
+              <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/30 bg-ink-900 text-xl text-accent shadow-glow">
+                {s.icon}
+                <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent font-mono text-xs font-bold text-ink-950">{i + 1}</span>
               </div>
+              <h3 className="mt-5 font-semibold text-white">{s.title}</h3>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-slate-400">{s.text}</p>
             </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Cross-case */}
+      <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6 lg:px-8">
+        <div className="card relative overflow-hidden p-8 sm:p-12">
+          <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-cyan-glow/10 blur-3xl" />
+          <div className="relative grid items-center gap-10 lg:grid-cols-2">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-glow/30 bg-cyan-glow/10 px-3 py-1 text-xs font-semibold text-cyan-glow">
+                <FiGitMerge /> Cross-case intelligence
+              </div>
+              <h2 className="mt-5 font-display text-3xl font-bold text-white sm:text-4xl">Connect cases other tools keep apart</h2>
+              <p className="mt-4 text-slate-400">
+                Compare any two investigations to uncover shared mule accounts, common emails, phones and IPs, money that flows from one case into the other,
+                overlapping activity windows and matching typologies - summarised as a single link score.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <LinkButton to="/compare" variant="outline" icon={<FiGitMerge />}>
+                  Compare cases
+                </LinkButton>
+                <Button variant="ghost" onClick={demo.runPair} loading={demo.loading === "pair"} icon={<FiPlay />}>
+                  Run the linked-case demo
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ["Shared accounts", "ACC1015 · ACC1018"],
+                ["Shared identifiers", "1 email address"],
+                ["Cross-case flows", "ACC1004 → ACC1015 → ACC3006"],
+                ["Link score", "Critical · 94 / 100"],
+              ].map(([k, v]) => (
+                <div key={k} className="rounded-xl border border-white/[0.06] bg-ink-900/70 p-4">
+                  <div className="label">{k}</div>
+                  <div className="mt-1.5 font-mono text-sm text-slate-200">{v}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <Footer />
-      </div>
-      {/* Popups */}
-      <ContributePopup
-        show={showContributePopup}
-        onClose={() => setShowContributePopup(false)}
-      />
-      <SignInRequiredModal
-        show={showSignInModal}
-        onClose={() => setShowSignInModal(false)}
-        onSignIn={() => {
-          window.location.href = import.meta.env.VITE_APP_GOOGLE_AUTH_URL;
-        }}
-      />
-      <SignInReminderModal
-        show={showReminderModal}
-        onClose={() => setShowReminderModal(false)}
-      />
+      </section>
+
+      {/* CTA */}
+      <section className="mx-auto max-w-4xl px-4 pt-24 text-center sm:px-6 lg:px-8">
+        <h2 className="font-display text-3xl font-bold text-white sm:text-5xl">
+          Start your first investigation <span className="text-gradient">now</span>
+        </h2>
+        <p className="mx-auto mt-4 max-w-xl text-slate-400">No setup required. Upload a CSV or explore the demo case to see ThreatLens in action.</p>
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <LinkButton to="/analyze" size="lg" icon={<FiArrowRight />}>
+            Get started
+          </LinkButton>
+          <LinkButton to={GITHUB_URL} external variant="secondary" size="lg">
+            Star on GitHub
+          </LinkButton>
+        </div>
+      </section>
     </div>
   );
 };
-
-const TerminalText = ({ text }: { text: string }) => (
-  <span className="font-mono tracking-wide text-sm sm:text-lg">{`> ${text}`}</span>
-);
-
-const StatCard = ({ value, label }: { value: string; label: string }) => (
-  <motion.div
-    whileHover={{ scale: 1.05 }}
-    className="text-center p-4 sm:p-6 bg-[#00ff9d]/5 rounded-xl border border-[#00ff9d]/20"
-  >
-    <div className="text-2xl sm:text-4xl font-bold text-[#00ff9d] mb-2">
-      {value}
-    </div>
-    <div className="text-gray-400 text-sm sm:text-lg">{label}</div>
-  </motion.div>
-);
-
-const FeatureCard = ({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) => (
-  <motion.div
-    whileHover={{ y: -8, scale: 1.02 }}
-    className="p-6 sm:p-8 border border-[#00ff9d]/20 rounded-2xl bg-[#0d0d0d] hover:border-[#00ff9d]/50 transition-all duration-300 group"
-  >
-    <div className="text-[#00ff9d] mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-      {icon}
-    </div>
-    <h3 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-white group-hover:text-[#00ff9d] transition-colors">
-      {title}
-    </h3>
-    <p className="text-gray-400 text-sm sm:text-lg leading-relaxed">
-      {description}
-    </p>
-  </motion.div>
-);
-
-const InvestigationFeature = ({
-  icon,
-  title,
-  description,
-  features,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  features: string[];
-}) => (
-  <motion.div
-    whileHover={{ scale: 1.02 }}
-    className="p-6 sm:p-8 border border-[#00ff9d]/20 rounded-2xl bg-[#0d0d0d] hover:border-[#00ff9d]/40 transition-all"
-  >
-    <div className="flex items-center mb-4 sm:mb-6">
-      <div className="text-[#00ff9d] mr-3 sm:mr-4">{icon}</div>
-      <h3 className="text-xl sm:text-2xl font-semibold">{title}</h3>
-    </div>
-    <p className="text-gray-400 mb-4 sm:mb-6 text-sm sm:text-lg">
-      {description}
-    </p>
-    <ul className="space-y-2">
-      {features.map((feature, index) => (
-        <li
-          key={index}
-          className="flex items-center text-gray-300 text-sm sm:text-base"
-        >
-          <FiCheck className="text-[#00ff9d] mr-2 sm:mr-3 flex-shrink-0" />
-          {feature}
-        </li>
-      ))}
-    </ul>
-  </motion.div>
-);
 
 export default Home;
