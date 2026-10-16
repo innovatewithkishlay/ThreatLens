@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { PageLoader } from "../ui/Spinner";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 export const Background = () => (
   <div aria-hidden className="no-print pointer-events-none fixed inset-0 z-0 overflow-hidden">
@@ -21,9 +22,11 @@ export const AppShell = () => {
       <Background />
       <Navbar />
       <main className="relative z-10 flex-1">
-        <Suspense fallback={<PageLoader />}>
-          <Outlet />
-        </Suspense>
+        <ErrorBoundary key={pathname}>
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>
