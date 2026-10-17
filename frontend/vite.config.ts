@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => {
   const target = env.VITE_PROXY_TARGET || "http://localhost:5002";
   return {
     plugins: [react()],
+    define: {
+      __BUILD__: JSON.stringify((env.RENDER_GIT_COMMIT || process.env.RENDER_GIT_COMMIT || "dev").slice(0, 7)),
+    },
     server: {
       port: 5173,
       // The API runs on a separate port in development. Proxying keeps
