@@ -1,0 +1,26 @@
+name: probe
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          U=https://threatlens-762p.onrender.com
+          curl -s -D - $U/analyze | head -40
+          for f in $(curl -s $U/ | grep -o 'assets/[^"]*\.js'); do echo "== $f"; curl -s $U/$f | grep -o 'export{[^}]*}' | head -c 3000; echo; done
+          curl -s $U/ | grep -o 'assets/[^"]*\.js' > main.txt
+          M=$(cat main.txt); curl -s $U/$M | grep -o 'assets/Analyze-[^"]*\.js' | head -1
+      - run: |
+          npm i playwright@1.56.1 >/dev/null 2>&1 && npx playwright install chromium >/dev/null 2>&1
+          cat > t.mjs <<'JS'
+          import { chromium } from "playwright";
+          const U = "https://threatlens-762p.onrender.com";
+          const b = await chromium.launch();
+          const run = async (label, fn) => { const p = await b.newPage(); const e=[]; p.on("pageerror", x => e.push(x.message+"\n"+x.stack)); p.on("console", m => m.type()==="error" && e.push("console: "+m.text())); await fn(p); await p.waitForTimeout(4000); console.log("###", label, p.url(), await p.title(), (await p.locator("h1").allInnerTexts()).join("|"), "\n", e.join("\n---\n")); await p.close(); };
+          await run("direct analyze", p => p.goto(U + "/analyze"));
+          await run("home->analyze", async p => { await p.goto(U + "/"); await p.waitForTimeout(3000); await p.getByRole("link", {name: "Analyze"}).first().click(); });
+          await run("404->analyze", async p => { await p.goto(U + "/zzz"); await p.waitForTimeout(3000); await p.getByRole("link", {name: "Analyze"}).first().click(); });
+          await run("home->cases", async p => { await p.goto(U + "/"); await p.waitForTimeout(3000); await p.getByRole("link", {name: "Cases"}).first().click(); });
+          await b.close();
+          JS
+          node t.mjs
