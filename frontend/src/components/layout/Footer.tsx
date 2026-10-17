@@ -39,7 +39,7 @@ export const Footer = () => (
     <div className="border-t border-white/[0.04]">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-slate-600 sm:flex-row sm:px-6 lg:px-8">
         <p>© {new Date().getFullYear()} ThreatLens. Released under the MIT License.</p>
-        <p className="font-mono">Built for investigators, by the open-source community.</p>
+        <p className="font-mono">Built for investigators, by the open-source community · build {__BUILD__}</p>
       </div>
     </div>
   </footer>
