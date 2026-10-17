@@ -15,7 +15,11 @@ export const Background = () => (
 
 export const AppShell = () => {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Block body on purpose: newer browsers return a Promise from scrollTo, which
+  // React would otherwise treat as a cleanup function and crash on navigation.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   return (
     <div className="relative flex min-h-screen flex-col">

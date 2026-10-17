@@ -44,7 +44,9 @@ export const TransactionsTable = ({
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => setPage(0), [query, show, filter, sort]);
+  useEffect(() => {
+    setPage(0);
+  }, [query, show, filter, sort]);
 
   const rows = useMemo(() => {
     const ids = filter?.ids ? new Set(filter.ids) : null;

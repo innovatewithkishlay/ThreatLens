@@ -36,7 +36,9 @@ export const Navbar = () => {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  useEffect(() => setMobileOpen(false), [location.pathname]);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();

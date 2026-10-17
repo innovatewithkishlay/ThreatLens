@@ -100,7 +100,9 @@ export const NetworkGraph = ({ nodes, edges, height = 560, colorMode = "risk", h
   }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => fit(), [simNodes, width, height]);
+  useEffect(() => {
+    fit();
+  }, [simNodes, width, height]);
 
   // Node dragging (d3-drag stops the event reaching the zoom handler).
   const scaleRef = useRef(1);
